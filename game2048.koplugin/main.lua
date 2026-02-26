@@ -27,7 +27,19 @@ local Input = Device.input
 local Screen = Device.screen
 
 local Game2048Widget = require("ui.widget.game2048widget")
+local GameBoard = require("gameboard")
 
+-- Game state
+local GameState = {}
+
+function GameState:new(obj)
+    obj = obj or {
+        board = GameBoard:new(),
+    }
+    setmetatable(obj, self)
+    self.__index = self
+    return obj
+end
 
 -- Main game screen (only shown when selected from menu)
 local Game2048Screen = FocusManager:extend{
@@ -137,6 +149,10 @@ local Game2048 = WidgetContainer:extend{
 
 function Game2048:init()
     self.ui.menu:registerToMainMenu(self)
+
+    -- Initialize variables
+    self.screen = nil
+    self.state = GameState:new()
 
     -- When debugging
     --UIManager:nextTick(function() self:showGame() end)
