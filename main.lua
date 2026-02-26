@@ -5,6 +5,7 @@ This is a game inspired by 2048
 --]]--
 
 local Blitbuffer = require("ffi/blitbuffer")
+local CenterContainer = require("ui/widget/container/centercontainer")
 local Device = require("device")
 local FocusManager = require("ui/widget/focusmanager")
 local VerticalGroup = require("ui/widget/verticalgroup")
@@ -19,10 +20,13 @@ local TextWidget = require("ui/widget/textwidget")
 local TitleBar = require("ui/widget/titlebar")
 local UIManager = require("ui/uimanager")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
+local logger = require("logger")
 local _ = require("gettext")
 
 local Input = Device.input
 local Screen = Device.screen
+
+local Game2048Widget = require("ui.widget.game2048widget")
 
 
 -- Main game screen (only shown when selected from menu)
@@ -38,10 +42,6 @@ function Game2048Screen:init()
     }
     self.covers_fullscreen = true -- hint for UIManager:_repaint()
 
-    -- Padding (maybe remove)
-    self.body_hpad = Size.padding.large
-    self.body_vpad = Size.padding.large
-
     self.title_bar = TitleBar:new{
         fullscreen = true,
         title = self.title,
@@ -53,9 +53,40 @@ function Game2048Screen:init()
 
     self.body = OverlapGroup:new{
         dimen = Geom:new{
-            w = self.dimen.w  - 2 * self.body_hpad,
-            h = self.dimen.h - self.title_bar:getSize().h - 2 * self.body_vpad,
+            w = self.dimen.w,
+            h = self.dimen.h - self.title_bar:getSize().h,
         }
+    }
+
+    -- Game widget
+    self._game_widget = Game2048Widget:new{
+        width = self.body.dimen.w * 0.8,
+        numbers = {
+            0, 1, 2, 3,
+            4, 5, 6, 7,
+            8, 9, 10, 11,
+            20, 26, 27, 28,
+        },
+        move_handler = function(dir) self:onGame2048Move(dir) end,
+        --numbers = {
+        --    0, 1, 2,
+        --    4, 5, 6,
+        --    20, 26, 28,
+        --},
+        --numbers = {
+        --    0, 1, 2, 3,
+        --    4, 5, 6, 7,
+        --    8, 9, 10, 11,
+        --    20, 26, 27, 28,
+        --    15, 16, 17, 18,
+        --    19, 20, 21, 22, 23
+        --},
+    }
+
+    self.body[1] = CenterContainer:new{
+        ignore = 'height',
+        dimen = self.body.dimen,
+        self._game_widget
     }
 
     -- Frame container ensures the background is drawn to solid color
@@ -77,11 +108,22 @@ function Game2048Screen:init()
     if Device:hasKeys() then
         self.key_events.Close = { { Input.group.Back } }
     end
+
+    local layout = {}
+    for n = 1,#self.body do
+        layout[n] = self.body[n]
+    end
+    self.layout = layout
+    self:refocusWidget()
 end
 
 function Game2048Screen:onClose()
-    UIManager:close(self)
-    self.plugin:onScreenClosed()
+    self.plugin:closeScreen()
+    return true
+end
+
+function Game2048Screen:onGame2048Move(dir)
+    logger.dbg("2048 Move: ", dir)
 end
 
 
@@ -120,7 +162,9 @@ function Game2048:showGame()
     UIManager:show(self.screen)
 end
 
-function Game2048:onScreenClosed()
+function Game2048:closeScreen()
+    UIManager:close(self.screen)
+    self.screen:free()
     self.screen = nil
 end
 
