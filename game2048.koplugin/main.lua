@@ -35,9 +35,16 @@ local GameState = {}
 function GameState:new(obj)
     obj = obj or {
         board = GameBoard:new(),
+        delayed_tile_placement = nil,
     }
     setmetatable(obj, self)
     self.__index = self
+
+    -- Initialize
+    -- Place first tile
+    obj.board:reset()
+    obj.board:placeNew()
+
     return obj
 end
 
@@ -73,26 +80,8 @@ function Game2048Screen:init()
     -- Game widget
     self._game_widget = Game2048Widget:new{
         width = self.body.dimen.w * 0.8,
-        numbers = {
-            0, 1, 2, 3,
-            4, 5, 6, 7,
-            8, 9, 10, 11,
-            20, 26, 27, 28,
-        },
+        numbers = self.plugin.state.board:getField(),
         move_handler = function(dir) self:onGame2048Move(dir) end,
-        --numbers = {
-        --    0, 1, 2,
-        --    4, 5, 6,
-        --    20, 26, 28,
-        --},
-        --numbers = {
-        --    0, 1, 2, 3,
-        --    4, 5, 6, 7,
-        --    8, 9, 10, 11,
-        --    20, 26, 27, 28,
-        --    15, 16, 17, 18,
-        --    19, 20, 21, 22, 23
-        --},
     }
 
     self.body[1] = CenterContainer:new{
@@ -135,7 +124,22 @@ function Game2048Screen:onClose()
 end
 
 function Game2048Screen:onGame2048Move(dir)
-    logger.dbg("2048 Move: ", dir)
+    local state = self.plugin.state
+    if not state.delayed_tile_placement then
+        local board = state.board
+        if board:shift(dir) then
+            self._game_widget:setNumbers(board:getField())
+            UIManager:setDirty(self, "ui")
+            -- delay placing new tile
+            state.delayed_tile_placement = function ()
+                state.delayed_tile_placement = nil
+                board:placeNew()
+                self._game_widget:setNumbers(board:getField())
+                UIManager:setDirty(self, "ui")
+            end
+            UIManager:scheduleIn(0.1, state.delayed_tile_placement)
+        end
+    end
 end
 
 
