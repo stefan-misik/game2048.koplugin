@@ -32,13 +32,15 @@ local Screen = Device.screen
 
 local Game2048Widget = require("ui.widget.game2048widget")
 local GameBoard = require("gameboard")
+local History = require("history")
 
 -- Game state
-local GameState = {}
+local Game2048State = {}
 
-function GameState:new(obj)
+function Game2048State:new(obj)
     obj = obj or {
         board = GameBoard:new(),
+        history = History:new(),
         delayed_tile_placement = nil,
     }
     setmetatable(obj, self)
@@ -49,11 +51,53 @@ function GameState:new(obj)
     return obj
 end
 
-function GameState:reset()
+function Game2048State:reset()
+    self.history:clear()
     self.board:reset()
     -- Place first tile
     self.board:placeNew()
+    self:pushToHistory()
 end
+
+function Game2048State:pushToHistory()
+    self.history:push(self:_captureState())
+end
+
+function Game2048State:historyUndo()
+    if self.delayed_tile_placement then
+        return false
+    end
+    local state = self.history:undo()
+    if not state then
+        return false
+    end
+    return self:_applyState(state)
+end
+
+function Game2048State:historyRedo()
+    if self.delayed_tile_placement then
+        return false
+    end
+    local state = self.history:redo()
+    if not state then
+        return false
+    end
+    return self:_applyState(state)
+end
+
+function Game2048State:_captureState()
+    return {
+        board = self.board:getFieldCopy(),
+    }
+end
+
+function Game2048State:_applyState(state)
+    if not self.board:setFieldCopy(state.board) then
+        return false
+    end
+    return true
+end
+
 
 -- Main game screen (only shown when selected from menu)
 local Game2048Screen = FocusManager:extend{
@@ -106,15 +150,23 @@ function Game2048Screen:init()
                 },
                 {
                     icon = "chevron.left",
-                    enabled = false,
+                    enabled_func = function()
+                        return self.plugin.state.history:canUndo()
+                    end,
                     width = Screen:scaleBySize(80),
-                    callback = function() end,
+                    callback = function()
+                        self:onUndo()
+                    end,
                 },
                 {
                     icon = "chevron.right",
-                    enabled = false,
+                    enabled_func = function()
+                        return self.plugin.state.history:canRedo()
+                    end,
                     width = Screen:scaleBySize(80),
-                    callback = function() end,
+                    callback = function()
+                        self:onRedo()
+                    end,
                 },
             },
         },
@@ -176,11 +228,26 @@ function Game2048Screen:onGame2048Move(dir)
                 state.delayed_tile_placement = nil
                 board:placeNew()
                 self._game_widget:setNumbers(board:getField())
+                state:pushToHistory()
                 UIManager:setDirty(self, "ui")
             end
             UIManager:scheduleIn(0.1, state.delayed_tile_placement)
         end
     end
+end
+
+function Game2048Screen:onUndo()
+    local state = self.plugin.state
+    state:historyUndo()
+    self._game_widget:setNumbers(state.board:getField())
+    UIManager:setDirty(self, "ui")
+end
+
+function Game2048Screen:onRedo()
+    local state = self.plugin.state
+    state:historyRedo()
+    self._game_widget:setNumbers(state.board:getField())
+    UIManager:setDirty(self, "ui")
 end
 
 
@@ -197,7 +264,7 @@ function Game2048:init()
 
     -- Initialize variables
     self.screen = nil
-    self.state = GameState:new()
+    self.state = Game2048State:new()
 
     -- When debugging
     --UIManager:nextTick(function() self:showGame() end)
