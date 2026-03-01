@@ -32,6 +32,7 @@ local Screen = Device.screen
 
 local Game2048Widget = require("ui.widget.game2048widget")
 local GameBoard = require("gameboard")
+local History = require("history")
 
 -- Game state
 local GameState = {}
@@ -39,6 +40,7 @@ local GameState = {}
 function GameState:new(obj)
     obj = obj or {
         board = GameBoard:new(),
+        history = History:new(),
         delayed_tile_placement = nil,
     }
     setmetatable(obj, self)
@@ -50,6 +52,7 @@ function GameState:new(obj)
 end
 
 function GameState:reset()
+    self.history:clear()
     self.board:reset()
     -- Place first tile
     self.board:placeNew()
@@ -106,13 +109,17 @@ function Game2048Screen:init()
                 },
                 {
                     icon = "chevron.left",
-                    enabled = false,
+                    enabled_func = function()
+                        return self.plugin.state.history:canUndo()
+                    end,
                     width = Screen:scaleBySize(80),
                     callback = function() end,
                 },
                 {
                     icon = "chevron.right",
-                    enabled = false,
+                    enabled_func = function()
+                        return self.plugin.state.history:canRedo()
+                    end,
                     width = Screen:scaleBySize(80),
                     callback = function() end,
                 },
