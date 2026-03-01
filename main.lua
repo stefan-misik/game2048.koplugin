@@ -5,20 +5,24 @@ This is a game inspired by 2048
 --]]--
 
 local Blitbuffer = require("ffi/blitbuffer")
+local BottomContainer = require("ui/widget/container/bottomcontainer")
+local ButtonTable = require("ui/widget/buttontable")
 local CenterContainer = require("ui/widget/container/centercontainer")
+local ConfirmBox = require("ui/widget/confirmbox")
 local Device = require("device")
 local FocusManager = require("ui/widget/focusmanager")
-local VerticalGroup = require("ui/widget/verticalgroup")
-local OverlapGroup = require("ui/widget/overlapgroup")
 local Font = require("ui/font")
 local FrameContainer = require("ui/widget/container/framecontainer")
 local Geom = require("ui/geometry")
 local InfoMessage = require("ui/widget/infomessage")
 local InputContainer = require("ui/widget/container/inputcontainer")
+local OverlapGroup = require("ui/widget/overlapgroup")
 local Size = require("ui/size")
 local TextWidget = require("ui/widget/textwidget")
 local TitleBar = require("ui/widget/titlebar")
 local UIManager = require("ui/uimanager")
+local VerticalGroup = require("ui/widget/verticalgroup")
+local VerticalSpan = require("ui/widget/verticalspan")
 local WidgetContainer = require("ui/widget/container/widgetcontainer")
 local logger = require("logger")
 local _ = require("gettext")
@@ -41,11 +45,14 @@ function GameState:new(obj)
     self.__index = self
 
     -- Initialize
-    -- Place first tile
-    obj.board:reset()
-    obj.board:placeNew()
-
+    obj:reset()
     return obj
+end
+
+function GameState:reset()
+    self.board:reset()
+    -- Place first tile
+    self.board:placeNew()
 end
 
 -- Main game screen (only shown when selected from menu)
@@ -54,7 +61,6 @@ local Game2048Screen = FocusManager:extend{
 }
 
 function Game2048Screen:init()
-    self.layout = {}
     self.dimen = Geom:new{
         w = Screen:getWidth(),
         h = Screen:getHeight(),
@@ -70,25 +76,55 @@ function Game2048Screen:init()
         show_parent = self,
     }
 
-    self.body = OverlapGroup:new{
-        dimen = Geom:new{
-            w = self.dimen.w,
-            h = self.dimen.h - self.title_bar:getSize().h,
-        }
+    self.body = VerticalGroup:new{
+        align = "center",
     }
 
     -- Game widget
     self._game_widget = Game2048Widget:new{
-        width = self.body.dimen.w * 0.8,
+        width = self.dimen.w * 0.7,
+        face = Font:getFace("tfont", 35),
         numbers = self.plugin.state.board:getField(),
         move_handler = function(dir) self:onGame2048Move(dir) end,
     }
 
-    self.body[1] = CenterContainer:new{
-        ignore = 'height',
-        dimen = self.body.dimen,
-        self._game_widget
+    self.body[1] = ButtonTable:new{
+        width = self.dimen.w,
+        buttons = {
+            {
+                {
+                    text = _("New game"),
+                    width = Screen:scaleBySize(200),
+                    callback = function()
+                        UIManager:show(ConfirmBox:new{
+                            text = _("Start a new game?"),
+                            ok_callback = function()
+                                self:resetGame()
+                            end,
+                        })
+                    end,
+                },
+                {
+                    icon = "chevron.left",
+                    enabled = false,
+                    width = Screen:scaleBySize(80),
+                    callback = function() end,
+                },
+                {
+                    icon = "chevron.right",
+                    enabled = false,
+                    width = Screen:scaleBySize(80),
+                    callback = function() end,
+                },
+            },
+        },
     }
+
+    self.body[2] = VerticalSpan:new{
+        width = Screen:scaleBySize(30),
+    }
+
+    self.body[3] = self._game_widget
 
     -- Frame container ensures the background is drawn to solid color
     self[1] = FrameContainer:new{
@@ -110,12 +146,17 @@ function Game2048Screen:init()
         self.key_events.Close = { { Input.group.Back } }
     end
 
-    local layout = {}
-    for n = 1,#self.body do
-        layout[n] = self.body[n]
-    end
-    self.layout = layout
+    self.layout = {
+        self.body[2],
+    }
     self:refocusWidget()
+end
+
+function Game2048Screen:resetGame()
+    local state = self.plugin.state
+    state:reset()
+    self._game_widget:setNumbers(state.board:getField())
+    UIManager:setDirty(self, "ui")
 end
 
 function Game2048Screen:onClose()
