@@ -7,6 +7,7 @@ local GestureRange = require("ui/gesturerange")
 local InputContainer = require("ui/widget/container/inputcontainer")
 local RenderText = require("ui/rendertext")
 local Size = require("ui/size")
+local UIManager = require("ui/uimanager")
 
 local Screen = Device.screen
 
@@ -22,6 +23,7 @@ for n = 1,MAX_VALUE do
 end
 
 -- Configuration
+local BORDER_SIZE_FOCUS = Size.line.thin
 local BORDER_SIZE = Size.line.thick
 local BORDER_COLOR = Blitbuffer.COLOR_BLACK
 local FRAME_COLOR = Blitbuffer.COLOR_WHITE
@@ -71,6 +73,8 @@ local Game2048Widget = InputContainer:extend{
     _size = nil,
     _tile_side = nil,
     _value_str_props = nil,
+    _has_focus = false,
+    _is_active = false,
 }
 
 function Game2048Widget:init()
@@ -114,7 +118,11 @@ function Game2048Widget:paintTo(bb, x, y)
         self.dimen.y = y
     end
     bb:paintRoundedRect(x, y, self.width, self.width, FRAME_COLOR, FRAME_RADIUS)
-    bb:paintBorder(x, y, self.width, self.width, BORDER_SIZE, BORDER_COLOR, FRAME_RADIUS)
+    if self._is_active then
+        bb:paintBorder(x, y, self.width, self.width, BORDER_SIZE, BORDER_COLOR, FRAME_RADIUS)
+    elseif self._has_focus then
+        bb:paintBorder(x, y, self.width, self.width, BORDER_SIZE_FOCUS, BORDER_COLOR, FRAME_RADIUS)
+    end
 
     -- Continue only if a valid 
     local size = self._size
@@ -161,6 +169,7 @@ function Game2048Widget:setNumbers(numbers)
     if ALLOWED_LENGTHS[#numbers] then
         self.numbers = numbers
         self:_update()
+        UIManager:setDirty(self.show_parent or self, "ui", self.dimen)
     end
 end
 
@@ -220,15 +229,33 @@ function Game2048Widget:_registerTouchEvents()
     if Device:isTouchDevice() then
         self.ges_events.Swipe = { GestureRange:new{ ges = "swipe", range = self.dimen, }}
     end
+    -- Tap gesture is passed by FucusManager
+    self.ges_events.TapGame2048 = { GestureRange:new{ ges = "tap", range = self.dimen, }}
+end
+
+function Game2048Widget:setActive(active)
+    self._is_active = active
+    UIManager:setDirty(self.show_parent or self, "fast", self:getSize())
 end
 
 Game2048Widget.onPhysicalKeyboardConnected = Game2048Widget._registerKeyEvents
 
 function Game2048Widget:onGame2048Move(dir)
+    if not self._is_active then
+        return false
+    end
     if self.move_handler then
         self.move_handler(dir)
     end
     return true
+end
+
+function Game2048Widget:onTapGame2048()
+    if self._has_focus then
+        self._is_active = not self._is_active
+        UIManager:setDirty(self.show_parent or self, "fast", self:getSize())
+    end
+    return false
 end
 
 local GES_TO_DIR_MAP = {
@@ -244,6 +271,15 @@ function Game2048Widget:onSwipe(arg, ges_ev)
         return true
     end
     return false
+end
+
+function Game2048Widget:onFocus()
+    self._has_focus = true
+end
+
+function Game2048Widget:onUnfocus()
+    self._has_focus = false
+    self._is_active = false
 end
 
 

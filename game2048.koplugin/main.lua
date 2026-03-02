@@ -110,8 +110,9 @@ function Game2048Screen:init()
         h = Screen:getHeight(),
     }
     self.covers_fullscreen = true -- hint for UIManager:_repaint()
+    self.layout = {}
 
-    self.title_bar = TitleBar:new{
+    self._title_bar = TitleBar:new{
         fullscreen = true,
         title = self.title,
         left_icon = "appbar.menu",
@@ -120,20 +121,14 @@ function Game2048Screen:init()
         show_parent = self,
     }
 
-    self.body = VerticalGroup:new{
+    self._body = VerticalGroup:new{
         align = "center",
     }
 
-    -- Game widget
-    self._game_widget = Game2048Widget:new{
-        width = self.dimen.w * 0.7,
-        face = Font:getFace("tfont", 35),
-        numbers = self.plugin.state.board:getField(),
-        move_handler = function(dir) self:onGame2048Move(dir) end,
-    }
-
-    self.body[1] = ButtonTable:new{
+    -- Buttons
+    self._buttons = ButtonTable:new{
         width = self.dimen.w,
+        show_parent = self,
         buttons = {
             {
                 {
@@ -171,12 +166,25 @@ function Game2048Screen:init()
             },
         },
     }
+    self:mergeLayoutInVertical(self._buttons)
 
-    self.body[2] = VerticalSpan:new{
+    self._body[1] = self._buttons
+
+    self._body[2] = VerticalSpan:new{
         width = Screen:scaleBySize(30),
     }
 
-    self.body[3] = self._game_widget
+    -- Game widget
+    self._game_widget = Game2048Widget:new{
+        width = self.dimen.w * 0.7,
+        show_parent = self,
+        face = Font:getFace("tfont", 35),
+        numbers = self.plugin.state.board:getField(),
+        move_handler = function(dir) self:onGame2048Move(dir) end,
+    }
+
+    self._body[3] = self._game_widget
+    self.layout[#self.layout+1] = {self._game_widget}
 
     -- Frame container ensures the background is drawn to solid color
     self[1] = FrameContainer:new{
@@ -189,8 +197,8 @@ function Game2048Screen:init()
         VerticalGroup:new{
             align = "center",
             background = Blitbuffer.COLOR_WHITE,
-            self.title_bar,
-            self.body,
+            self._title_bar,
+            self._body,
         }
     }
 
@@ -198,17 +206,19 @@ function Game2048Screen:init()
         self.key_events.Close = { { Input.group.Back } }
     end
 
-    self.layout = {
-        self.body[2],
-    }
     self:refocusWidget()
+    self:moveFocusTo(1, 2)
+    if not Device:hasDPad() then
+        -- Activate the main widget, so that it looks consistent when device has no way of activating it via keyboard
+        self._game_widget:setActive(true)
+    end
 end
 
 function Game2048Screen:resetGame()
     local state = self.plugin.state
     state:reset()
     self._game_widget:setNumbers(state.board:getField())
-    UIManager:setDirty(self, "ui")
+    UIManager:setDirty(self, "ui", self._buttons.dimen)
 end
 
 function Game2048Screen:onClose()
@@ -222,14 +232,13 @@ function Game2048Screen:onGame2048Move(dir)
         local board = state.board
         if board:shift(dir) then
             self._game_widget:setNumbers(board:getField())
-            UIManager:setDirty(self, "ui")
             -- delay placing new tile
             state.delayed_tile_placement = function ()
                 state.delayed_tile_placement = nil
                 board:placeNew()
                 self._game_widget:setNumbers(board:getField())
                 state:pushToHistory()
-                UIManager:setDirty(self, "ui")
+                UIManager:setDirty(self, "ui", self._buttons.dimen)
             end
             UIManager:scheduleIn(0.1, state.delayed_tile_placement)
         end
@@ -240,14 +249,14 @@ function Game2048Screen:onUndo()
     local state = self.plugin.state
     state:historyUndo()
     self._game_widget:setNumbers(state.board:getField())
-    UIManager:setDirty(self, "ui")
+    UIManager:setDirty(self, "ui", self._buttons.dimen)
 end
 
 function Game2048Screen:onRedo()
     local state = self.plugin.state
     state:historyRedo()
     self._game_widget:setNumbers(state.board:getField())
-    UIManager:setDirty(self, "ui")
+    UIManager:setDirty(self, "ui", self._buttons.dimen)
 end
 
 
