@@ -9,6 +9,7 @@ local BottomContainer = require("ui/widget/container/bottomcontainer")
 local ButtonTable = require("ui/widget/buttontable")
 local CenterContainer = require("ui/widget/container/centercontainer")
 local ConfirmBox = require("ui/widget/confirmbox")
+local DataStorage = require("datastorage")
 local Device = require("device")
 local FocusManager = require("ui/widget/focusmanager")
 local Font = require("ui/font")
@@ -16,6 +17,7 @@ local FrameContainer = require("ui/widget/container/framecontainer")
 local Geom = require("ui/geometry")
 local InfoMessage = require("ui/widget/infomessage")
 local InputContainer = require("ui/widget/container/inputcontainer")
+local LuaSettings = require("luasettings")
 local OverlapGroup = require("ui/widget/overlapgroup")
 local Size = require("ui/size")
 local TextWidget = require("ui/widget/textwidget")
@@ -34,8 +36,59 @@ local Game2048Widget = require("ui.widget.game2048widget")
 local GameBoard = require("gameboard")
 local History = require("history")
 
--- Game state
-local Game2048State = {}
+
+---@class Game2048Storage Game settings
+---@field name string
+---@field _settings LuaSettings
+local Game2048Storage = {
+    -- Settings name
+    name = "unknown_name",
+    _settings = nil,
+}
+Game2048Storage.__index = Game2048Storage
+
+function Game2048Storage:new(obj)
+    obj = obj or { };
+    setmetatable(obj, self)
+
+    obj._settings = LuaSettings:open(DataStorage:getSettingsDir() .. "/" .. obj.name .. ".lua")
+
+    return obj
+end
+
+--- Save state
+---@param state Game2048State  Game state
+function Game2048Storage:saveState(state)
+    local state_dump = {
+        history = state.history:save(),
+    }
+    self._settings:saveSetting("state", state_dump)
+end
+
+--- Read state
+---@param state Game2048State  Game state
+function Game2048Storage:readState(state)
+    local state_dump = self._settings:readSetting("state")
+    if state_dump then
+        return state.history:read(state_dump.history)
+    end
+    return false
+end
+
+function Game2048Storage:flush()
+    self._settings:flush()
+end
+
+
+---@class Game2048State
+---@field history History
+---@field board GameBoard
+---@field delayed_tile_placement function
+local Game2048State = {
+    history = nil,
+    board = nil,
+}
+Game2048State.__index = Game2048State
 
 function Game2048State:new(obj)
     obj = obj or {
@@ -44,7 +97,6 @@ function Game2048State:new(obj)
         delayed_tile_placement = nil,
     }
     setmetatable(obj, self)
-    self.__index = self
 
     -- Initialize
     obj:reset()
@@ -61,6 +113,15 @@ end
 
 function Game2048State:pushToHistory()
     self.history:push(self:_captureState())
+end
+
+function Game2048State:pullFromHistory()
+    local state = self.history:current()
+    if state then
+        self:_applyState(state)
+        return true
+    end
+    return false
 end
 
 function Game2048State:historyUndo()
@@ -287,6 +348,13 @@ function Game2048:init()
     self.screen = nil
     self.state = Game2048State:new()
 
+    self.storage = Game2048Storage:new{
+        name = self.name,
+    }
+    if self.storage:readState(self.state) then
+        self.state:pullFromHistory()
+    end
+
     -- When debugging
     --UIManager:nextTick(function() self:showGame() end)
 end
@@ -316,6 +384,8 @@ function Game2048:closeScreen()
     UIManager:close(self.screen)
     self.screen:free()
     self.screen = nil
+    self.storage:saveState(self.state)
+    self.storage:flush()
 end
 
 return Game2048

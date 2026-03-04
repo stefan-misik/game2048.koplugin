@@ -110,4 +110,41 @@ function History:_free(from, to)
     end
 end
 
+function History:save()
+    local hist = {}
+    local pos = 0
+    local it = self._tail
+    while it ~= self._head do
+        hist[#hist+1] = self._history[it]
+        if it == self._position then
+            pos = #hist
+        end
+        it = nextPosition(it, self.capacity)
+    end
+
+    return {
+        history = hist,
+        position = 0 ~= pos and pos or #hist
+    }
+end
+
+function History:read(dump)
+    if not dump or not dump.history or not dump.position then
+        return false
+    end
+
+    local history = {}
+    do
+        local offset = #dump.history > (self.capacity - 1) and (#dump.history - (self.capacity - 1)) + 1 or 1
+        for n = offset, #dump.history do
+            history[#history+1] = dump.history[n]
+        end
+    end
+    self._history = history
+    self._head = #history + 1
+    self._tail = 1
+    self._position = dump.position
+    return true
+end
+
 return History
