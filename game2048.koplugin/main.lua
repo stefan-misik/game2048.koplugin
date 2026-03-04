@@ -204,6 +204,8 @@ function Game2048Screen:init()
 
     if Device:hasKeys() then
         self.key_events.Close = { { Input.group.Back } }
+        self.key_events.Undo = { { Input.group.PgBack } }
+        self.key_events.Redo = { { Input.group.PgFwd } }
     end
 
     self:refocusWidget()
