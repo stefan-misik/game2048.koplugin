@@ -243,6 +243,7 @@ function Game2048Screen:onGame2048Move(dir)
             UIManager:scheduleIn(0.1, state.delayed_tile_placement)
         end
     end
+    return true
 end
 
 function Game2048Screen:onUndo()
@@ -250,6 +251,7 @@ function Game2048Screen:onUndo()
     state:historyUndo()
     self._game_widget:setNumbers(state.board:getField())
     UIManager:setDirty(self, "ui", self._buttons.dimen)
+    return true
 end
 
 function Game2048Screen:onRedo()
@@ -257,6 +259,7 @@ function Game2048Screen:onRedo()
     state:historyRedo()
     self._game_widget:setNumbers(state.board:getField())
     UIManager:setDirty(self, "ui", self._buttons.dimen)
+    return true
 end
 
 
