@@ -102,6 +102,11 @@ end
 -- Main game screen (only shown when selected from menu)
 local Game2048Screen = FocusManager:extend{
     title = "2048",
+
+    -- Game state object
+    state = nil,
+    -- Function called when game screen wants to be closed
+    close_cb = nil,
 }
 
 function Game2048Screen:init()
@@ -146,7 +151,7 @@ function Game2048Screen:init()
                 {
                     icon = "chevron.left",
                     enabled_func = function()
-                        return self.plugin.state.history:canUndo()
+                        return self.state.history:canUndo()
                     end,
                     width = Screen:scaleBySize(80),
                     callback = function()
@@ -156,7 +161,7 @@ function Game2048Screen:init()
                 {
                     icon = "chevron.right",
                     enabled_func = function()
-                        return self.plugin.state.history:canRedo()
+                        return self.state.history:canRedo()
                     end,
                     width = Screen:scaleBySize(80),
                     callback = function()
@@ -179,7 +184,7 @@ function Game2048Screen:init()
         width = self.dimen.w * 0.7,
         show_parent = self,
         face = Font:getFace("tfont", 35),
-        numbers = self.plugin.state.board:getField(),
+        numbers = self.state.board:getField(),
         move_handler = function(dir) self:onGame2048Move(dir) end,
     }
 
@@ -217,19 +222,21 @@ function Game2048Screen:init()
 end
 
 function Game2048Screen:resetGame()
-    local state = self.plugin.state
+    local state = self.state
     state:reset()
     self._game_widget:setNumbers(state.board:getField())
     UIManager:setDirty(self, "ui", self._buttons.dimen)
 end
 
 function Game2048Screen:onClose()
-    self.plugin:closeScreen()
+    if self.close_cb then
+        self.close_cb()
+    end
     return true
 end
 
 function Game2048Screen:onGame2048Move(dir)
-    local state = self.plugin.state
+    local state = self.state
     if not state.delayed_tile_placement then
         local board = state.board
         if board:shift(dir) then
@@ -249,7 +256,7 @@ function Game2048Screen:onGame2048Move(dir)
 end
 
 function Game2048Screen:onUndo()
-    local state = self.plugin.state
+    local state = self.state
     state:historyUndo()
     self._game_widget:setNumbers(state.board:getField())
     UIManager:setDirty(self, "ui", self._buttons.dimen)
@@ -257,7 +264,7 @@ function Game2048Screen:onUndo()
 end
 
 function Game2048Screen:onRedo()
-    local state = self.plugin.state
+    local state = self.state
     state:historyRedo()
     self._game_widget:setNumbers(state.board:getField())
     UIManager:setDirty(self, "ui", self._buttons.dimen)
@@ -299,7 +306,8 @@ function Game2048:showGame()
         return
     end
     self.screen = Game2048Screen:new{
-        plugin = self,
+        state = self.state,
+        close_cb = function() self:closeScreen() end,
     }
     UIManager:show(self.screen)
 end
