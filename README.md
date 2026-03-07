@@ -9,6 +9,6 @@ Game inspired by 2048 implemented as KOReader plugin.
 - [x] Basic working prototype
 - [x] History
 - [x] Non-touch control
-- [ ] Saving state
+- [x] Saving state
 - [ ] Scoreboard
 - [ ] Settings
