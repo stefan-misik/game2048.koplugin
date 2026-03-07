@@ -15,6 +15,8 @@ local FocusManager = require("ui/widget/focusmanager")
 local Font = require("ui/font")
 local FrameContainer = require("ui/widget/container/framecontainer")
 local Geom = require("ui/geometry")
+local HorizontalGroup = require("ui/widget/horizontalgroup")
+local HorizontalSpan = require("ui/widget/horizontalspan")
 local InfoMessage = require("ui/widget/infomessage")
 local InputContainer = require("ui/widget/container/inputcontainer")
 local LuaSettings = require("luasettings")
@@ -33,6 +35,7 @@ local Input = Device.input
 local Screen = Device.screen
 
 local Game2048Widget = require("ui.widget.game2048widget")
+local ScoreBoardWidget = require("ui.widget.scoreboardwidget")
 local GameBoard = require("gameboard")
 local History = require("history")
 
@@ -234,10 +237,63 @@ function Game2048Screen:init()
     }
     self:mergeLayoutInVertical(self._buttons)
 
-    self._body[1] = self._buttons
+    local SCREEN_PADDING = Screen:scaleBySize(20)
 
-    self._body[2] = VerticalSpan:new{
-        width = Screen:scaleBySize(30),
+    self._body[#self._body+1] = self._buttons
+
+    self._body[#self._body+1] = VerticalSpan:new{
+        width = SCREEN_PADDING,
+    }
+
+    self._info_board = {
+        score = ScoreBoardWidget:new{
+            name = _("Score"),
+            value = "0",
+        },
+        best = ScoreBoardWidget:new{
+            name = _("Best Score"),
+            value = "1942506999",
+        },
+        moves = ScoreBoardWidget:new{
+            name = _("Move"),
+            value = "0",
+        },
+        retries = ScoreBoardWidget:new{
+            name = _("Retries"),
+            value = "0",
+        },
+        timer = ScoreBoardWidget:new{
+            name = _("Timer"),
+            value = "0",
+        },
+    }
+
+    self._body[#self._body+1] = HorizontalGroup:new{
+        self._info_board.score,
+        HorizontalSpan:new{
+            width = SCREEN_PADDING,
+        },
+        self._info_board.best,
+        HorizontalSpan:new{
+            width = SCREEN_PADDING,
+        },
+        self._info_board.moves,
+    }
+
+    self._body[#self._body+1] = VerticalSpan:new{
+        width = SCREEN_PADDING,
+    }
+
+    self._body[#self._body+1] = HorizontalGroup:new{
+        self._info_board.retries,
+        HorizontalSpan:new{
+            width = 2 * SCREEN_PADDING + self._info_board.best.width,
+        },
+        self._info_board.timer,
+    }
+
+    self._body[#self._body+1] = VerticalSpan:new{
+        width = SCREEN_PADDING,
     }
 
     -- Game widget
@@ -249,7 +305,8 @@ function Game2048Screen:init()
         move_handler = function(dir) self:onGame2048Move(dir) end,
     }
 
-    self._body[3] = self._game_widget
+    self._body[#self._body+1] = self._game_widget
+
     self.layout[#self.layout+1] = {self._game_widget}
 
     -- Frame container ensures the background is drawn to solid color
