@@ -8,6 +8,7 @@ local GameBoard = {
     -- internally used
     _size = 4,
 }
+GameBoard.__index = GameBoard
 
 -- 10% chance of getting 4 tile
 local NEW_4_TILE_CHANCE_NUM = 1
@@ -19,7 +20,6 @@ function GameBoard:new(obj)
         _size = 4,
     }
     setmetatable(obj, self)
-    self.__index = self
 
     -- Ensure invariants
     if obj.field then
@@ -85,8 +85,9 @@ end
 
 --- Shift the game board in given direction
 ---@param dir Direction Direction to shift the game board in
+---@param new_tile_cb ?function callback, when two tile merge and value of new tile is passed
 ---@return boolean success Performed some shift
-function GameBoard:shift(dir)
+function GameBoard:shift(dir, new_tile_cb)
     local size = self._size
     -- This are variables that are used to navigate across game field depending on the chosen direction on movement
     local pos, tile_dist, group_dist
@@ -102,6 +103,7 @@ function GameBoard:shift(dir)
         return false -- nothing to do
     end
 
+    new_tile_cb = new_tile_cb or function(_) end
     -- perform the movement
     local field = self.field
     if not field then
@@ -119,7 +121,9 @@ function GameBoard:shift(dir)
                         -- Deposit the new value at tail position, since if we put it into head
                         -- position, it would be considered the second time (as a tail), which
                         -- will lead to a tile being combined multiple times
-                        field[tail_pos] = head_value + 1
+                        local new_value = head_value + 1
+                        new_tile_cb(new_value)
+                        field[tail_pos] = new_value
                         field[head_pos] = 0 -- mark as empty
                         did_shift = true
                     end

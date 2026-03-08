@@ -40,12 +40,24 @@ local GameBoard = require("gameboard")
 local History = require("history")
 
 
+---Convert seconds into format hh:mm:ss
+---@param seconds integer Seconds elapsed
+---@return string formatted_time
+local function timerToString(seconds)
+    local ss = math.floor(seconds % 60)
+    local mm = math.floor((seconds % 3600) / 60)
+    local hh = math.floor(seconds / 3600)
+    return string.format("%02d:%02d:%02d", hh, mm, ss)
+end
+
+
 ---@class Game2048Storage Game settings
 ---@field name string
 ---@field _settings LuaSettings
 local Game2048Storage = {
     -- Settings name
     name = "unknown_name",
+    profile = "default",
     _settings = nil,
 }
 Game2048Storage.__index = Game2048Storage
@@ -54,9 +66,13 @@ function Game2048Storage:new(obj)
     obj = obj or { };
     setmetatable(obj, self)
 
-    obj._settings = LuaSettings:open(DataStorage:getSettingsDir() .. "/" .. obj.name .. ".lua")
-
+    obj:_init()
     return obj
+end
+
+function Game2048Storage:_init()
+    self._settings = LuaSettings:open(DataStorage:getSettingsDir() .. "/" .. self.name .. ".lua")
+    self.profile = self._settings:readSetting("profile") or "default"
 end
 
 --- Save state
@@ -64,16 +80,18 @@ end
 function Game2048Storage:saveState(state)
     local state_dump = {
         history = state.history:save(),
+        info = state.info:saveUntracked(),
     }
-    self._settings:saveSetting("state", state_dump)
+    self._settings:saveSetting("state_"..self.profile, state_dump)
 end
 
 --- Read state
 ---@param state Game2048State  Game state
 function Game2048Storage:readState(state)
-    local state_dump = self._settings:readSetting("state")
+    local state_dump = self._settings:readSetting("state_"..self.profile)
     if state_dump then
-        return state.history:read(state_dump.history)
+        return state.history:read(state_dump.history) and
+            state.info:readUntracked(state_dump.info)
     end
     return false
 end
@@ -83,13 +101,121 @@ function Game2048Storage:flush()
 end
 
 
+---@class Game2048Info
+---@field score integer
+---@field best integer
+---@field retries integer
+---@field timer integer
+---@field _start ?integer
+local Game2048Info = {
+    score = 0,
+    best = 0,
+    moves = 0,
+    retries = 0,
+    timer = 0,
+
+    _start = nil,
+}
+Game2048Info.__index = Game2048Info
+
+function Game2048Info:new(obj)
+    obj = obj or { }
+    setmetatable(obj, self)
+
+    -- Initialize
+    obj:reset()
+    return obj
+end
+
+function Game2048Info:reset()
+    self.score = 0
+    self.best = 0
+    self.moves = 0
+    self.retries = 0
+    self.timer = 0
+    self._start = nil
+end
+
+function Game2048Info:newGameReset()
+    self.score = 0
+    self.moves = 0
+    self.retries = 0
+    self.timer = 0
+    self._start = nil
+end
+
+function Game2048Info:start()
+    self._start = os.time()
+end
+
+function Game2048Info:stop()
+    self.timer = self:calculateCurrentTimer()
+    self._start = nil
+end
+
+function Game2048Info:move(score)
+    local new_score = self.score + score
+    self.score = new_score
+    self.best = math.max(self.best, new_score)
+    self.moves = self.moves + 1
+    if not self._start then
+        self:start()
+    end
+end
+
+function Game2048Info:calculateCurrentTimer()
+    if not self._start then
+        return self.timer
+    end
+    return self.timer + (os.time() - self._start)
+end
+
+function Game2048Info:saveUntracked()
+    return {
+        retries = self.retries,
+        timer = self:calculateCurrentTimer(),
+    }
+end
+
+function Game2048Info:readUntracked(dump)
+    if not dump or not dump.retries or not dump.timer then
+        return false
+    end
+    self.retries = dump.retries
+    self.timer = dump.timer
+    self._start = nil
+    return true
+end
+
+function Game2048Info:save()
+    return {
+        score = self.score,
+        best = self.best,
+        moves = self.moves,
+    }
+end
+
+function Game2048Info:read(dump)
+    if not dump or not dump.score or not dump.best or not dump.moves then
+        return false
+    end
+    self.score = dump.score
+    self.best = dump.best
+    self.moves = dump.moves
+    return true
+end
+
+
 ---@class Game2048State
 ---@field history History
 ---@field board GameBoard
----@field delayed_tile_placement function
+---@field delayed_tile_placement ?function
+---@field info Game2048Info
 local Game2048State = {
     history = nil,
     board = nil,
+    info = nil,
+    delayed_tile_placement = nil,
 }
 Game2048State.__index = Game2048State
 
@@ -97,6 +223,7 @@ function Game2048State:new(obj)
     obj = obj or {
         board = GameBoard:new(),
         history = History:new(),
+        info = Game2048Info:new(),
         delayed_tile_placement = nil,
     }
     setmetatable(obj, self)
@@ -109,9 +236,31 @@ end
 function Game2048State:reset()
     self.history:clear()
     self.board:reset()
+    self.info:reset()
     -- Place first tile
     self.board:placeNew()
     self:pushToHistory()
+end
+
+function Game2048State:newGame()
+    self.history:clear()
+    self.board:reset()
+    self.info:newGameReset()
+    -- Place first tile
+    self.board:placeNew()
+    self:pushToHistory()
+end
+
+function Game2048State:move(dir)
+    local score = 0
+    local increment = function(new_tile)
+        score = score + math.pow(2, new_tile)
+    end
+    if self.board:shift(dir, increment) then
+        self.info:move(score)
+        return true
+    end
+    return false
 end
 
 function Game2048State:pushToHistory()
@@ -135,7 +284,11 @@ function Game2048State:historyUndo()
     if not state then
         return false
     end
-    return self:_applyState(state)
+    if not self:_applyState(state) then
+        return false
+    end
+    self.info.retries = self.info.retries + 1
+    return true
 end
 
 function Game2048State:historyRedo()
@@ -146,17 +299,22 @@ function Game2048State:historyRedo()
     if not state then
         return false
     end
-    return self:_applyState(state)
+    if not self:_applyState(state) then
+        return false
+    end
+    self.info.retries = self.info.retries - 1
+    return true
 end
 
 function Game2048State:_captureState()
     return {
         board = self.board:getFieldCopy(),
+        info = self.info:save(),
     }
 end
 
 function Game2048State:_applyState(state)
-    if not self.board:setFieldCopy(state.board) then
+    if not state or not self.board:setFieldCopy(state.board) or not self.info:read(state.info) then
         return false
     end
     return true
@@ -207,7 +365,7 @@ function Game2048Screen:init()
                         UIManager:show(ConfirmBox:new{
                             text = _("Start a new game?"),
                             ok_callback = function()
-                                self:resetGame()
+                                self:newGame()
                             end,
                         })
                     end,
@@ -248,23 +406,28 @@ function Game2048Screen:init()
     self._info_board = {
         score = ScoreBoardWidget:new{
             name = _("Score"),
-            value = "0",
+            value = "",
+            show_parent = self,
         },
         best = ScoreBoardWidget:new{
             name = _("Best Score"),
-            value = "1942506999",
+            value = "",
+            show_parent = self,
         },
         moves = ScoreBoardWidget:new{
             name = _("Move"),
-            value = "0",
+            value = "",
+            show_parent = self,
         },
         retries = ScoreBoardWidget:new{
             name = _("Retries"),
-            value = "0",
+            value = "",
+            show_parent = self,
         },
         timer = ScoreBoardWidget:new{
             name = _("Timer"),
-            value = "0",
+            value = "",
+            show_parent = self,
         },
     }
 
@@ -325,6 +488,9 @@ function Game2048Screen:init()
         }
     }
 
+    -- Set first values
+    self:_updateInfo()
+
     if Device:hasKeys() then
         self.key_events.Close = { { Input.group.Back } }
         self.key_events.Undo = { { Input.group.PgBack } }
@@ -339,10 +505,11 @@ function Game2048Screen:init()
     end
 end
 
-function Game2048Screen:resetGame()
+function Game2048Screen:newGame()
     local state = self.state
-    state:reset()
+    state:newGame()
     self._game_widget:setNumbers(state.board:getField())
+    self:_updateInfo()
     UIManager:setDirty(self, "ui", self._buttons.dimen)
 end
 
@@ -357,7 +524,7 @@ function Game2048Screen:onGame2048Move(dir)
     local state = self.state
     if not state.delayed_tile_placement then
         local board = state.board
-        if board:shift(dir) then
+        if state:move(dir) then
             self._game_widget:setNumbers(board:getField())
             -- delay placing new tile
             state.delayed_tile_placement = function ()
@@ -365,6 +532,8 @@ function Game2048Screen:onGame2048Move(dir)
                 board:placeNew()
                 self._game_widget:setNumbers(board:getField())
                 state:pushToHistory()
+                self:_updateInfo()
+                -- Update undo, redo buttons
                 UIManager:setDirty(self, "ui", self._buttons.dimen)
             end
             UIManager:scheduleIn(0.1, state.delayed_tile_placement)
@@ -373,10 +542,21 @@ function Game2048Screen:onGame2048Move(dir)
     return true
 end
 
+function Game2048Screen:_updateInfo()
+    local info = self.state.info
+    local ui = self._info_board
+    ui.score:setValue(tostring(info.score))
+    ui.best:setValue(tostring(info.best))
+    ui.moves:setValue(tostring(info.moves))
+    ui.retries:setValue(tostring(info.retries))
+    ui.timer:setValue(timerToString(info:calculateCurrentTimer()))
+end
+
 function Game2048Screen:onUndo()
     local state = self.state
     state:historyUndo()
     self._game_widget:setNumbers(state.board:getField())
+    self:_updateInfo()
     UIManager:setDirty(self, "ui", self._buttons.dimen)
     return true
 end
@@ -385,6 +565,7 @@ function Game2048Screen:onRedo()
     local state = self.state
     state:historyRedo()
     self._game_widget:setNumbers(state.board:getField())
+    self:_updateInfo()
     UIManager:setDirty(self, "ui", self._buttons.dimen)
     return true
 end
@@ -441,6 +622,7 @@ function Game2048:closeScreen()
     UIManager:close(self.screen)
     self.screen:free()
     self.screen = nil
+    self.state.info:stop()
     self.storage:saveState(self.state)
     self.storage:flush()
 end
