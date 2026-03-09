@@ -159,11 +159,11 @@ function GameBoard:shift(dir, new_tile_cb)
 end
 
 ---Place a new tile in the field
----@return boolean success
+---@return integer|nil location
 function GameBoard:placeNew()
     local field = self.field
     if not field then
-        return false
+        return nil
     end
 
     -- First count the empty spots
@@ -175,23 +175,25 @@ function GameBoard:placeNew()
     end
     if 0 == empty_spots then
         -- Nowhere to place the new tile
-        return false
+        return nil
     end
 
     -- Place the new tile
     local new_value = (math.random(NEW_4_TILE_CHANCE_DEN) <= NEW_4_TILE_CHANCE_NUM) and 2 or 1
     local place_dist = math.random(empty_spots)
+    local place_pos = nil
     for n = 1, #field do
         if 0 == field[n] then
             if 1 == place_dist then
                 -- Place the new value here and terminate the iteration
                 field[n] = new_value
+                place_pos = n
                 break
             end
             place_dist = place_dist - 1
         end
     end
-    return true
+    return place_pos
 end
 
 function GameBoard:dump()

@@ -75,6 +75,7 @@ local Game2048Widget = InputContainer:extend{
     _value_str_props = nil,
     _has_focus = false,
     _is_active = false,
+    _hidden_tile_index = 0,
 }
 
 function Game2048Widget:init()
@@ -144,7 +145,7 @@ function Game2048Widget:paintTo(bb, x, y)
                     TILE_BORDER_SIZE, TILE_BORDER_COLOR, TILE_RADIUS)
             
             -- No need to check the boundaries as we would not be here if #self.numbers ~= (size * size)
-            local value = self.numbers[number_pos]
+            local value = number_pos ~= self._hidden_tile_index and self.numbers[number_pos] or 0
             if value > 0 then
                 local value_str, prop = VALUE_STR[value] or TILE_FALLBACK_TEXT,
                     self._value_str_props[value] or self._value_str_props[MAX_VALUE + 1]  -- ... or fallback
@@ -165,14 +166,25 @@ function Game2048Widget:paintTo(bb, x, y)
 
 end
 
-function Game2048Widget:setNumbers(numbers)
+function Game2048Widget:setNumbers(numbers, animate_new_tile)
     if ALLOWED_LENGTHS[#numbers] then
         self.numbers = numbers
         self:_update()
+        if animate_new_tile and animate_new_tile <= #numbers and animate_new_tile > 0 then
+            UIManager:unschedule(Game2048Widget._uncoverHiddenTile)
+            self._hidden_tile_index = animate_new_tile
+            UIManager:scheduleIn(0.1, Game2048Widget._uncoverHiddenTile, self)
+        else
+            self._hidden_tile_index = 0
+        end
         UIManager:setDirty(self.show_parent or self, "ui", self.dimen)
     end
 end
 
+function Game2048Widget:_uncoverHiddenTile()
+    self._hidden_tile_index = 0
+    UIManager:setDirty(self.show_parent or self, "ui", self.dimen)
+end
 
 function Game2048Widget:_update()
     local size = ALLOWED_LENGTHS[#self.numbers] or nil

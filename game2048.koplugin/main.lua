@@ -209,13 +209,11 @@ end
 ---@class Game2048State
 ---@field history History
 ---@field board GameBoard
----@field delayed_tile_placement ?function
 ---@field info Game2048Info
 local Game2048State = {
     history = nil,
     board = nil,
     info = nil,
-    delayed_tile_placement = nil,
 }
 Game2048State.__index = Game2048State
 
@@ -224,7 +222,6 @@ function Game2048State:new(obj)
         board = GameBoard:new(),
         history = History:new(),
         info = Game2048Info:new(),
-        delayed_tile_placement = nil,
     }
     setmetatable(obj, self)
 
@@ -277,9 +274,6 @@ function Game2048State:pullFromHistory()
 end
 
 function Game2048State:historyUndo()
-    if self.delayed_tile_placement then
-        return false
-    end
     local state = self.history:undo()
     if not state then
         return false
@@ -292,9 +286,6 @@ function Game2048State:historyUndo()
 end
 
 function Game2048State:historyRedo()
-    if self.delayed_tile_placement then
-        return false
-    end
     local state = self.history:redo()
     if not state then
         return false
@@ -522,22 +513,14 @@ end
 
 function Game2048Screen:onGame2048Move(dir)
     local state = self.state
-    if not state.delayed_tile_placement then
+    if state:move(dir) then
         local board = state.board
-        if state:move(dir) then
-            self._game_widget:setNumbers(board:getField())
-            -- delay placing new tile
-            state.delayed_tile_placement = function ()
-                state.delayed_tile_placement = nil
-                board:placeNew()
-                self._game_widget:setNumbers(board:getField())
-                state:pushToHistory()
-                self:_updateInfo()
-                -- Update undo, redo buttons
-                UIManager:setDirty(self, "ui", self._buttons.dimen)
-            end
-            UIManager:scheduleIn(0.1, state.delayed_tile_placement)
-        end
+        local new_tile_pos = board:placeNew()
+        self._game_widget:setNumbers(board:getField(), new_tile_pos)
+        state:pushToHistory()
+        self:_updateInfo()
+        -- Update undo, redo buttons
+        UIManager:setDirty(self, "ui", self._buttons.dimen)
     end
     return true
 end
