@@ -57,8 +57,6 @@ end
 local Game2048Storage = {
     -- Settings name
     name = "unknown_name",
-    profile = "default",
-    _settings = nil,
 }
 Game2048Storage.__index = Game2048Storage
 
@@ -107,15 +105,7 @@ end
 ---@field retries integer
 ---@field timer integer
 ---@field _start ?integer
-local Game2048Info = {
-    score = 0,
-    best = 0,
-    moves = 0,
-    retries = 0,
-    timer = 0,
-
-    _start = nil,
-}
+local Game2048Info = { }
 Game2048Info.__index = Game2048Info
 
 function Game2048Info:new(obj)
@@ -210,24 +200,23 @@ end
 ---@field history History
 ---@field board GameBoard
 ---@field info Game2048Info
-local Game2048State = {
-    history = nil,
-    board = nil,
-    info = nil,
-}
+local Game2048State = { }
 Game2048State.__index = Game2048State
 
 function Game2048State:new(obj)
-    obj = obj or {
-        board = GameBoard:new(),
-        history = History:new(),
-        info = Game2048Info:new(),
-    }
+    obj = obj or { }
     setmetatable(obj, self)
 
     -- Initialize
+    obj:_init()
     obj:reset()
     return obj
+end
+
+function Game2048State:_init()
+    self.board = GameBoard:new()
+    self.history = History:new()
+    self.info = Game2048Info:new()
 end
 
 function Game2048State:reset()

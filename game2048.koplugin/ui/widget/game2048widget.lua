@@ -207,7 +207,7 @@ function Game2048Widget:_update()
     for n = 1, (MAX_VALUE + 1) do  -- One additional props for the fallback text
         local value_str = VALUE_STR[n] or TILE_FALLBACK_TEXT
         local face = self.face
-        local tsize = nil
+        local tsize
         while true do
             tsize = RenderText:sizeUtf8Text(0, Screen:getWidth(), face, value_str, TILE_KERNING, self.bold)
             if tsize.x <= max_text_width then
