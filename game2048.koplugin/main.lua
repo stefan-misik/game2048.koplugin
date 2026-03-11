@@ -333,46 +333,58 @@ function Game2048Screen:init()
     }
 
     -- Buttons
-    self._buttons = ButtonTable:new{
-        width = self.dimen.w,
-        show_parent = self,
-        buttons = {
+    do
+        local buttons = {
             {
-                {
-                    text = _("New game"),
-                    width = Screen:scaleBySize(200),
-                    callback = function()
-                        UIManager:show(ConfirmBox:new{
-                            text = _("Start a new game?"),
-                            ok_callback = function()
-                                self:newGame()
-                            end,
-                        })
-                    end,
-                },
-                {
-                    icon = "chevron.left",
-                    enabled_func = function()
-                        return self.state.history:canUndo()
-                    end,
-                    width = Screen:scaleBySize(80),
-                    callback = function()
-                        self:onUndo()
-                    end,
-                },
-                {
-                    icon = "chevron.right",
-                    enabled_func = function()
-                        return self.state.history:canRedo()
-                    end,
-                    width = Screen:scaleBySize(80),
-                    callback = function()
-                        self:onRedo()
-                    end,
-                },
+                text = _("New game"),
+                width = Screen:scaleBySize(200),
+                callback = function()
+                    UIManager:show(ConfirmBox:new{
+                        text = _("Start a new game?"),
+                        ok_callback = function()
+                            self:newGame()
+                        end,
+                    })
+                end,
             },
-        },
-    }
+            {
+                icon = "chevron.left",
+                enabled_func = function()
+                    return self.state.history:canUndo()
+                end,
+                width = Screen:scaleBySize(80),
+                callback = function()
+                    self:onUndo()
+                end,
+            },
+            {
+                icon = "chevron.right",
+                enabled_func = function()
+                    return self.state.history:canRedo()
+                end,
+                width = Screen:scaleBySize(80),
+                callback = function()
+                    self:onRedo()
+                end,
+            },
+        }
+        if Device:hasFrontlight() then
+            table.insert(buttons, #buttons+1, {
+                icon = "appbar.contrast",
+                width = Screen:scaleBySize(80),
+                callback = function()
+                    -- Stop the timer when changing backlight, it will start automatically after next move
+                    self.state.info:stop()
+                    Device:showLightDialog()
+                end,
+            })
+        end
+        self._buttons = ButtonTable:new{
+            width = self.dimen.w,
+            show_parent = self,
+            buttons = { buttons },
+        }
+    end
     self:mergeLayoutInVertical(self._buttons)
 
     local SCREEN_PADDING = Screen:scaleBySize(20)
