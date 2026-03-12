@@ -36,6 +36,7 @@ local Screen = Device.screen
 
 local Game2048Widget = require("ui.widget.game2048widget")
 local ScoreBoardWidget = require("ui.widget.scoreboardwidget")
+local Game2048Config = require("modules.game2048config")
 local GameBoard = require("gameboard")
 local History = require("history")
 
@@ -76,18 +77,27 @@ end
 --- Save state
 ---@param state Game2048State  Game state
 function Game2048Storage:saveState(state)
+    -- State
     local state_dump = {
         history = state.history:save(),
         info = state.info:saveUntracked(),
+        settings = {
+        },
     }
     self._settings:saveSetting("state_"..self.profile, state_dump)
+    -- Settings
+    self._settings:saveSetting("settings", state.settings:dump())
 end
 
 --- Read state
 ---@param state Game2048State  Game state
 function Game2048Storage:readState(state)
+    -- Settings
+    state.settings:merge(self._settings:readSetting("settings"))
+    -- State
     local state_dump = self._settings:readSetting("state_"..self.profile)
     if state_dump then
+        state.settings:merge(state_dump.settings)
         return state.history:read(state_dump.history) and
             state.info:readUntracked(state_dump.info)
     end
@@ -223,6 +233,7 @@ function Game2048State:_init()
     self.board = GameBoard:new()
     self.history = History:new()
     self.info = Game2048Info:new()
+    self.settings = Game2048Config.makeDefaultSettings()
 end
 
 function Game2048State:reset()
@@ -236,7 +247,7 @@ end
 
 function Game2048State:newGame()
     self.history:clear()
-    self.board:reset()
+    self.board:setSize(self.settings.size)  -- also resets the game
     self.info:newGameReset()
     -- Place first tile
     self.board:placeNew()
@@ -325,11 +336,16 @@ function Game2048Screen:init()
     self.covers_fullscreen = true -- hint for UIManager:_repaint()
     self.layout = {}
 
+    self._config = Game2048Config:new{
+        configurable = self.state.settings,
+        new_settings_callback = function() self:onNewSettings() end,
+    }
+
     self._title_bar = TitleBar:new{
         fullscreen = true,
         title = self.title,
         left_icon = "appbar.menu",
-        left_icon_tap_callback = function() end,
+        left_icon_tap_callback = function() self:onShowSettings() end,
         close_callback = function() self:onClose() end,
         show_parent = self,
     }
@@ -486,6 +502,9 @@ function Game2048Screen:init()
         }
     }
 
+    -- Apply UI-related settings
+    self:applySettings()
+
     -- Set first values
     self:_updateInfo()
 
@@ -509,6 +528,21 @@ function Game2048Screen:newGame()
     self._game_widget:setNumbers(state.board:getField())
     self:_updateInfo()
     UIManager:setDirty(self, "ui", self._buttons.dimen)
+end
+
+function Game2048Screen:applySettings()
+    local settings = self.state.settings
+    local game_widget = self._game_widget
+    game_widget.new_tile_delay = settings.new_tile_delay
+    local themes = require("ui.theme.game2048widgettheme")
+    local theme_n = 1
+    for n, theme in ipairs(themes) do
+        if theme.id == settings.theme then
+            theme_n = n
+            break
+        end
+    end
+    game_widget:setPalette(themes[theme_n].palette)
 end
 
 function Game2048Screen:onClose()
@@ -558,6 +592,16 @@ function Game2048Screen:onRedo()
     self:_updateInfo()
     UIManager:setDirty(self, "ui", self._buttons.dimen)
     return true
+end
+
+function Game2048Screen:onShowSettings()
+    self.state.info:stop()
+    self._config:showConfigMenu()
+end
+
+function Game2048Screen:onNewSettings()
+    self:applySettings()
+    self.state.info:start()
 end
 
 function Game2048Screen:onSuspend()

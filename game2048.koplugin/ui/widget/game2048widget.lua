@@ -12,7 +12,7 @@ local UIManager = require("ui/uimanager")
 local Screen = Device.screen
 
 local ALLOWED_LENGTHS = {
-    [9] = 3, [16] = 4, [25] = 5,
+    [4] = 2, [9] = 3, [16] = 4, [25] = 5,
 }
 
 local MAX_VALUE = 2 + 25
@@ -52,19 +52,9 @@ local Game2048Widget = InputContainer:extend{
     bold = false,
 
     -- Tile color palette
-    palette = {
-        Blitbuffer.COLOR_GRAY_E,
-        Blitbuffer.COLOR_LIGHT_GRAY,
-        Blitbuffer.COLOR_GRAY,
-        Blitbuffer.COLOR_GRAY_9,
-        Blitbuffer.COLOR_GRAY_7,
-        Blitbuffer.COLOR_GRAY_6,
-        Blitbuffer.COLOR_GRAY_4,
-        Blitbuffer.COLOR_GRAY_3,
-        Blitbuffer.COLOR_GRAY_2,
-        Blitbuffer.COLOR_GRAY_1,
-        Blitbuffer.COLOR_BLACK,
-    },
+    palette = require("ui.theme.game2048widgettheme")[1].palette,
+    -- Other settings
+    new_tile_delay = 0.1,
 
     -- Notify about events
     move_handler = nil,
@@ -170,15 +160,21 @@ function Game2048Widget:setNumbers(numbers, animate_new_tile)
     if ALLOWED_LENGTHS[#numbers] then
         self.numbers = numbers
         self:_update()
-        if animate_new_tile and animate_new_tile <= #numbers and animate_new_tile > 0 then
+        local new_tile_delay = self.new_tile_delay
+        if animate_new_tile and new_tile_delay > 0.01 and animate_new_tile <= #numbers and animate_new_tile > 0 then
             UIManager:unschedule(Game2048Widget._uncoverHiddenTile)
             self._hidden_tile_index = animate_new_tile
-            UIManager:scheduleIn(0.1, Game2048Widget._uncoverHiddenTile, self)
+            UIManager:scheduleIn(new_tile_delay, Game2048Widget._uncoverHiddenTile, self)
         else
             self._hidden_tile_index = 0
         end
         UIManager:setDirty(self.show_parent or self, "ui", self.dimen)
     end
+end
+
+function Game2048Widget:setPalette(palette)
+    self.palette = palette
+    UIManager:setDirty(self.show_parent or self, "ui", self.dimen)
 end
 
 function Game2048Widget:_uncoverHiddenTile()

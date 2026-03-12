@@ -14,6 +14,10 @@ GameBoard.__index = GameBoard
 local NEW_4_TILE_CHANCE_NUM = 1
 local NEW_4_TILE_CHANCE_DEN = 10
 
+local ALLOWED_LENGTHS = {
+    [4] = 2, [9] = 3, [16] = 4, [25] = 5,
+}
+
 function GameBoard:new(obj)
     obj = obj or {
         field = nil,
@@ -67,11 +71,12 @@ function GameBoard:getFieldCopy()
 end
 
 function GameBoard:setFieldCopy(field)
-    local size = self._size
-    if #field ~= (size * size) then
+    local new_size = ALLOWED_LENGTHS[#field]
+    if not new_size then
         return false
     end
     self.field = { unpack(field) }
+    self._size = new_size
     return true
 end
 
