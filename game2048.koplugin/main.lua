@@ -134,8 +134,14 @@ function Game2048Info:newGameReset()
     self._start = nil
 end
 
+function Game2048Info:isRunning()
+    return not not self._start
+end
+
 function Game2048Info:start()
-    self._start = os.time()
+    if not self._start then
+        self._start = os.time()
+    end
 end
 
 function Game2048Info:stop()
@@ -552,6 +558,14 @@ function Game2048Screen:onRedo()
     self:_updateInfo()
     UIManager:setDirty(self, "ui", self._buttons.dimen)
     return true
+end
+
+function Game2048Screen:onSuspend()
+    self.state.info:stop()
+end
+
+function Game2048Screen:onResume()
+    self.state.info:start()
 end
 
 
