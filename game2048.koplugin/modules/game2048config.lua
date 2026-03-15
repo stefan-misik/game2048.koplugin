@@ -10,6 +10,7 @@ local Game2048Settings = { }
 Game2048Settings.__index = Game2048Settings
 
 Game2048Settings.DEFAULTS = {
+    profile = "default",
     size = 4,
     new_tile_delay = 0.1,
     theme = "default",
@@ -98,6 +99,15 @@ function Game2048Config:init()
                     name_text = _("Color Theme"),
                     item_text = { _("Select") .. "…" },
                     event = "SelectTheme",
+                },
+                {
+                    name = "profile",
+                    name_text = _("Profile"),
+                    toggle = { "1", "2", "3", "4", "5", "6", },
+                    values = { "default", "player2", "player3", "player4", "player5", "player6", },
+                    default_value = Game2048Settings.DEFAULTS.profile,
+                    event = "DummyEvent",
+                    args = { "default", "player2", "player3", "player4", "player5", "player6", },
                 },
             },
         },
