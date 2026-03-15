@@ -66,7 +66,6 @@ local Game2048Widget = InputContainer:extend{
     _has_focus = false,
     _is_active = false,
     _hidden_tile_index = 0,
-    _is_fast_ui = false,
 }
 
 function Game2048Widget:init()
@@ -88,9 +87,6 @@ function Game2048Widget:init()
     end
     -- Adjust bold face (source: textwidget.lua)
     self.face, self.bold = Font:getAdjustedFace(self.face, self.bold)
-
-    -- Check the palette
-    self:_checkPalette()
 
     -- Register events
     self:_registerKeyEvents()
@@ -172,25 +168,13 @@ function Game2048Widget:setNumbers(numbers, animate_new_tile)
         else
             self._hidden_tile_index = 0
         end
-        UIManager:setDirty(self.show_parent or self, self._is_fast_ui and "fast" or "ui", self.dimen)
+        UIManager:setDirty(self.show_parent or self, "ui", self.dimen)
     end
 end
 
 function Game2048Widget:setPalette(palette)
     self.palette = palette
-    self:_checkPalette()
     UIManager:setDirty(self.show_parent or self, "ui", self.dimen)
-end
-
-function Game2048Widget:_checkPalette()
-    local is_fast_ui = true
-    for _, color in ipairs(self.palette) do
-        if color ~= Blitbuffer.COLOR_WHITE and color ~= Blitbuffer.COLOR_BLACK then
-            is_fast_ui = false
-            break
-        end
-    end
-    self._is_fast_ui = is_fast_ui
 end
 
 function Game2048Widget:_uncoverHiddenTile()
