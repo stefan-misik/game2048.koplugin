@@ -510,6 +510,7 @@ function Game2048Screen:init()
 
     if Device:hasKeys() then
         self.key_events.Close = { { Input.group.Back } }
+        self.key_events.SettingsMenu = { { "Menu" } }
         self.key_events.Undo = { { Input.group.PgBack } }
         self.key_events.Redo = { { Input.group.PgFwd } }
     end
@@ -549,6 +550,11 @@ function Game2048Screen:onClose()
     if self.close_cb then
         self.close_cb()
     end
+    return true
+end
+
+function Game2048Screen:onSettingsMenu()
+    self._config:showConfigMenu()
     return true
 end
 
