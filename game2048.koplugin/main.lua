@@ -71,22 +71,28 @@ end
 
 function Game2048Storage:_init()
     self._settings = LuaSettings:open(DataStorage:getSettingsDir() .. "/" .. self.name .. ".lua")
-    self.profile = self._settings:readSetting("profile") or "default"
 end
 
 --- Save state
 ---@param state Game2048State  Game state
 function Game2048Storage:saveState(state)
-    -- State
+    self:saveGameState(state.profile, state)
+    -- Settings
+    self._settings:saveSetting("settings", state.settings:dump())
+end
+
+--- Save game state
+---@param profile string Name of the state to save
+---@param state Game2048State Game state
+function Game2048Storage:saveGameState(profile, state)
+    print("2048 writing profile", profile)
     local state_dump = {
         history = state.history:save(),
         info = state.info:saveUntracked(),
         settings = {
         },
     }
-    self._settings:saveSetting("state_"..self.profile, state_dump)
-    -- Settings
-    self._settings:saveSetting("settings", state.settings:dump())
+    self._settings:saveSetting("state_"..profile, state_dump)
 end
 
 --- Read state
@@ -94,14 +100,38 @@ end
 function Game2048Storage:readState(state)
     -- Settings
     state.settings:merge(self._settings:readSetting("settings"))
-    -- State
-    local state_dump = self._settings:readSetting("state_"..self.profile)
+    state.profile = state.settings.profile
+    return self:readGameState(state.profile, state)
+end
+
+--- Read game state
+---@param profile string Name of the state to save
+---@param state Game2048State Game state
+function Game2048Storage:readGameState(profile, state)
+    print("2048 reading profile", profile)
+    local state_dump = self._settings:readSetting("state_"..profile)
     if state_dump then
         state.settings:merge(state_dump.settings)
-        return state.history:read(state_dump.history) and
-            state.info:readUntracked(state_dump.info)
+        if state.history:read(state_dump.history) and state.info:readUntracked(state_dump.info) then
+            return state:pullFromHistory()  -- Read data from history into game board and info (score board)
+        end
     end
     return false
+end
+
+--- If selected game state differs from current, switch to it
+---@param state Game2048State
+function Game2048Storage:switchGameState(state)
+    if state.settings.profile == state.profile then
+        return false
+    end
+
+    print("2048 switch profile", state.profile, state.settings.profile)
+
+    self:saveGameState(state.profile, state)
+    state.profile = state.settings.profile
+    self:readGameState(state.profile, state)
+    return true
 end
 
 function Game2048Storage:flush()
@@ -216,6 +246,7 @@ end
 ---@field history History
 ---@field board GameBoard
 ---@field info Game2048Info
+---@field profile string
 local Game2048State = { }
 Game2048State.__index = Game2048State
 
@@ -234,6 +265,7 @@ function Game2048State:_init()
     self.history = History:new()
     self.info = Game2048Info:new()
     self.settings = Game2048Config.makeDefaultSettings()
+    self.profile = self.settings.profile
 end
 
 function Game2048State:reset()
@@ -532,6 +564,10 @@ function Game2048Screen:newGame()
 end
 
 function Game2048Screen:applySettings()
+    if self.storage:switchGameState(self.state) then
+        self._game_widget:setNumbers(self.state.board:getField())
+        UIManager:setDirty(self, "ui", self._buttons.dimen)
+    end
     local settings = self.state.settings
     local game_widget = self._game_widget
     game_widget.new_tile_delay = settings.new_tile_delay
@@ -637,9 +673,7 @@ function Game2048:init()
     self.storage = Game2048Storage:new{
         name = self.name,
     }
-    if self.storage:readState(self.state) then
-        self.state:pullFromHistory()
-    end
+    self.storage:readState(self.state)
 
     -- When debugging
     --UIManager:nextTick(function() self:showGame() end)
@@ -661,6 +695,7 @@ function Game2048:showGame()
     end
     self.screen = Game2048Screen:new{
         state = self.state,
+        storage = self.storage,
         close_cb = function() self:closeScreen() end,
     }
     UIManager:show(self.screen)
