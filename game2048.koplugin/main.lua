@@ -370,6 +370,7 @@ function Game2048Screen:init()
     self.layout = {}
 
     self._config = Game2048Config:new{
+        ui = self,
         configurable = self.state.settings,
         new_settings_callback = function() self:onNewSettings() end,
     }
@@ -564,24 +565,37 @@ function Game2048Screen:newGame()
     UIManager:setDirty(self, "ui", self._buttons.dimen)
 end
 
-function Game2048Screen:applySettings()
+local function loadGame2048WidgetThemePalette(theme_name)
+    local themes = require("ui.theme.game2048widgettheme")
+    local theme_n = 1
+    for n, theme in ipairs(themes) do
+        if theme.id == theme_name then
+            theme_n = n
+            break
+        end
+    end
+    return themes[theme_n].palette
+end
+
+function Game2048Screen:onThemeChange(theme_name)
+    self._game_widget:setPalette(loadGame2048WidgetThemePalette(theme_name))
+end
+
+function Game2048Screen:onProfileChange(profile_name)
+    -- New profile name is already applied to the game's settings object,
+    -- therefore there is no need to use th passed new profile_name
     if self.storage:switchGameState(self.state) then
         self._game_widget:setNumbers(self.state.board:getField())
         self:_updateInfo()
         UIManager:setDirty(self, "ui", self._buttons.dimen)
     end
+end
+
+function Game2048Screen:applySettings()
     local settings = self.state.settings
     local game_widget = self._game_widget
     game_widget.new_tile_delay = settings.new_tile_delay
-    local themes = require("ui.theme.game2048widgettheme")
-    local theme_n = 1
-    for n, theme in ipairs(themes) do
-        if theme.id == settings.theme then
-            theme_n = n
-            break
-        end
-    end
-    game_widget:setPalette(themes[theme_n].palette)
+    game_widget:setPalette(loadGame2048WidgetThemePalette(settings.theme))
 end
 
 function Game2048Screen:onClose()

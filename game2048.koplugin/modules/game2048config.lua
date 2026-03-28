@@ -1,12 +1,15 @@
 local ButtonDialog = require("ui/widget/buttondialog")
 local ConfigDialog = require("ui/widget/configdialog")
+local Event = require("ui/event")
 local InfoMessage = require("ui/widget/infomessage")  -- luacheck:ignore
 local InputContainer = require("ui/widget/container/inputcontainer")
 local UIManager = require("ui/uimanager")
 local _ = require("gettext")
 
 
-local Game2048Settings = { }
+local Game2048Settings = {
+    ui = nil,
+}
 Game2048Settings.__index = Game2048Settings
 
 Game2048Settings.DEFAULTS = {
@@ -188,6 +191,14 @@ function Game2048Config:onConfigChange(option_name, option_value)
         })
     end
     self.configurable[option_name] = option_value
+
+    -- Report selected events to parent
+    if "theme" == option_name then
+        self.ui:handleEvent(Event:new("ThemeChange", option_value))
+    elseif "profile" == option_name then
+        self.ui:handleEvent(Event:new("ProfileChange", option_value))
+    end
+
     return true
 end
 
