@@ -242,6 +242,7 @@ function Game2048State:reset()
     self.info:reset()
     -- Place first tile
     self.board:placeNew()
+    self.board:placeNew()
     self:pushToHistory()
 end
 
@@ -250,6 +251,7 @@ function Game2048State:newGame()
     self.board:setSize(self.settings.size)  -- also resets the game
     self.info:newGameReset()
     -- Place first tile
+    self.board:placeNew()
     self.board:placeNew()
     self:pushToHistory()
 end
