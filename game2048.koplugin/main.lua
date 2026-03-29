@@ -646,7 +646,7 @@ function Game2048:init()
 end
 
 function Game2048:addToMainMenu(menu_items)
-    menu_items.hello_world = {
+    menu_items.game2048 = {
         text = _("2048"),
         sorting_hint = "tools",
         callback = function()
