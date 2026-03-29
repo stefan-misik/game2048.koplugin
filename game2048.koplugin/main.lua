@@ -614,14 +614,28 @@ function Game2048Screen:onGame2048Move(dir)
     local state = self.state
     if state:move(dir) then
         local board = state.board
-        local new_tile_pos = board:placeNew()
+        local new_tile_pos, is_full = board:placeNew()
         self._game_widget:setNumbers(board:getField(), new_tile_pos)
         state:pushToHistory()
         self:_updateInfo()
         -- Update undo, redo buttons
         UIManager:setDirty(self, "ui", self._buttons.dimen)
+        if is_full and not board:canMerge() then
+            self:_showGameOver()
+        end
     end
     return true
+end
+
+function Game2048Screen:_showGameOver()
+    self.state.info:stop()
+    UIManager:show(ConfirmBox:new{
+        text = _("Game over!\n\nStart a new game?"),
+        ok_text = _("New game"),
+        ok_callback = function()
+            self:newGame()
+        end,
+    })
 end
 
 function Game2048Screen:_updateInfo()

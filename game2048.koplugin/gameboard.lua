@@ -163,12 +163,13 @@ function GameBoard:shift(dir, new_tile_cb)
     return did_shift
 end
 
----Place a new tile in the field
----@return integer|nil location
+---Place a new tile in a random empty slot.
+---@return integer|nil location Index of the placed tile, or nil if the board was already full.
+---@return boolean board_full True when no free slots remain (either was already full, or the placed tile was the last).
 function GameBoard:placeNew()
     local field = self.field
     if not field then
-        return nil
+        return nil, true
     end
 
     -- First count the empty spots
@@ -180,7 +181,7 @@ function GameBoard:placeNew()
     end
     if 0 == empty_spots then
         -- Nowhere to place the new tile
-        return nil
+        return nil, true
     end
 
     -- Place the new tile
@@ -198,7 +199,30 @@ function GameBoard:placeNew()
             place_dist = place_dist - 1
         end
     end
-    return place_pos
+    -- Second return value: true when the tile just placed was the last empty slot
+    return place_pos, (1 == empty_spots)
+end
+
+---Returns true when at least two adjacent tiles can be merged.
+---Only call this when the board is known to be full (placeNew returned true as its second value).
+---@return boolean
+function GameBoard:canMerge()
+    local field = self.field
+    if not field then
+        return false
+    end
+    local size = self._size
+    for n = 1, #field do
+        -- Check right neighbor (not at right edge of the row)
+        if 0 ~= n % size and field[n] == field[n + 1] then
+            return true
+        end
+        -- Check down neighbor
+        if #field >= n + size and field[n] == field[n + size] then
+            return true
+        end
+    end
+    return false
 end
 
 function GameBoard:dump()
