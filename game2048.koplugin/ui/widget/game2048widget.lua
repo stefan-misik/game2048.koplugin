@@ -66,6 +66,7 @@ local Game2048Widget = InputContainer:extend{
     _has_focus = false,
     _is_active = false,
     _hidden_tile_index = 0,
+    _palette_is_rgb = false,
 }
 
 function Game2048Widget:init()
@@ -87,6 +88,8 @@ function Game2048Widget:init()
     end
     -- Adjust bold face (source: textwidget.lua)
     self.face, self.bold = Font:getAdjustedFace(self.face, self.bold)
+
+    self._palette_is_rgb = self.palette[1] and not Blitbuffer.isColor8(self.palette[1]) or false
 
     -- Register events
     self:_registerKeyEvents()
@@ -126,6 +129,7 @@ function Game2048Widget:paintTo(bb, x, y)
     local tile_dist = tile_side + SPACING
     local tile_y = y + PADDING
     local number_pos = 1
+    local paintRoundedRect = self._palette_is_rgb and bb.paintRoundedRectRGB32 or bb.paintRoundedRect
     for row = 1,size do
         local tile_x = x + PADDING
         for col = 1,size do
@@ -140,7 +144,7 @@ function Game2048Widget:paintTo(bb, x, y)
                 local value_str, prop = VALUE_STR[value] or TILE_FALLBACK_TEXT,
                     self._value_str_props[value] or self._value_str_props[MAX_VALUE + 1]  -- ... or fallback
                 local bg_color, fg_color = self:_getTileColors(value)
-                bb:paintRoundedRect(tile_x + INNER_TILE_MARGIN, tile_y + INNER_TILE_MARGIN,
+                paintRoundedRect(bb, tile_x + INNER_TILE_MARGIN, tile_y + INNER_TILE_MARGIN,
                     tile_side - (2 * INNER_TILE_MARGIN), tile_side - (2 * INNER_TILE_MARGIN),
                     bg_color, TILE_RADIUS - INNER_TILE_MARGIN)
                 RenderText:renderUtf8Text(bb,
@@ -174,6 +178,7 @@ end
 
 function Game2048Widget:setPalette(palette)
     self.palette = palette
+    self._palette_is_rgb = palette[1] and not Blitbuffer.isColor8(palette[1]) or false
     UIManager:setDirty(self.show_parent or self, "ui", self.dimen)
 end
 
