@@ -37,8 +37,8 @@ local Screen = Device.screen
 local Game2048Widget = require("ui.widget.game2048widget")
 local ScoreBoardWidget = require("ui.widget.scoreboardwidget")
 local Game2048Config = require("modules.game2048config")
-local GameBoard = require("gameboard")
-local History = require("history")
+local GameBoard = require("modules.gameboard")
+local History = require("modules.history")
 
 
 ---Convert seconds into format hh:mm:ss
