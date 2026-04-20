@@ -694,8 +694,6 @@ local Game2048 = WidgetContainer:extend{
 }
 
 function Game2048:init()
-    self.ui.menu:registerToMainMenu(self)
-
     -- Initialize variables
     self.screen = nil
     self.state = Game2048State:new()
@@ -707,6 +705,8 @@ function Game2048:init()
 
     -- When debugging
     --UIManager:nextTick(function() self:showGame() end)
+
+    self.ui.menu:registerToMainMenu(self)
 end
 
 function Game2048:addToMainMenu(menu_items)
