@@ -73,6 +73,14 @@ function Game2048Storage:_init()
     self._settings = LuaSettings:open(DataStorage:getSettingsDir() .. "/" .. self.name .. ".lua")
 end
 
+function Game2048Storage:purge(old_too)
+    local file = self._settings.file
+    if old_too and file then
+        os.remove(file..".old")
+    end
+    self._settings:purge()
+end
+
 --- Save state
 ---@param state Game2048State  Game state
 function Game2048Storage:saveState(state)
@@ -738,6 +746,11 @@ function Game2048:closeScreen()
     self.state.info:stop()
     self.storage:saveState(self.state)
     self.storage:flush()
+end
+
+function Game2048:deletePluginSettings()
+    self.storage:purge(true)
+    return true
 end
 
 return Game2048
