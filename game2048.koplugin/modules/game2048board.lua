@@ -1,14 +1,14 @@
 
 ---@alias Direction "up"|"down"|"left"|"right"
 
----@class GameBoard
-local GameBoard = {
+---@class Game2048Board
+local Game2048Board = {
     -- Array containing the field
     field = nil,
     -- internally used
     _size = 4,
 }
-GameBoard.__index = GameBoard
+Game2048Board.__index = Game2048Board
 
 -- 10% chance of getting 4 tile
 local NEW_4_TILE_CHANCE_NUM = 1
@@ -18,7 +18,7 @@ local ALLOWED_LENGTHS = {
     [4] = 2, [9] = 3, [16] = 4, [25] = 5,
 }
 
-function GameBoard:new(obj)
+function Game2048Board:new(obj)
     obj = obj or {
         field = nil,
         _size = 4,
@@ -37,19 +37,19 @@ function GameBoard:new(obj)
     return obj
 end
 
-function GameBoard:reset()
+function Game2048Board:reset()
     -- Use the current value
     self:setSize(self._size)
 end
 
-function GameBoard:copy()
-    return GameBoard:new{
+function Game2048Board:copy()
+    return Game2048Board:new{
         field = self.field and {unpack(self.field)} or nil,
         _size = self._size,
     }
 end
 
-function GameBoard:setSize(size)
+function Game2048Board:setSize(size)
     self._size = size
     local field = {}
     for n = 1, (size * size) do
@@ -58,19 +58,19 @@ function GameBoard:setSize(size)
     self.field = field
 end
 
-function GameBoard:getSize()
+function Game2048Board:getSize()
     return self._size
 end
 
-function GameBoard:getField()
+function Game2048Board:getField()
     return self.field
 end
 
-function GameBoard:getFieldCopy()
+function Game2048Board:getFieldCopy()
     return { unpack(self.field) }
 end
 
-function GameBoard:setFieldCopy(field)
+function Game2048Board:setFieldCopy(field)
     local new_size = ALLOWED_LENGTHS[#field]
     if not new_size then
         return false
@@ -84,7 +84,7 @@ end
 ---@param x integer Column
 ---@param y integer Row
 ---@return integer
-function GameBoard:getElement(x, y)
+function Game2048Board:getElement(x, y)
     return self.field[x + (self._size * (y - 1))]
 end
 
@@ -92,7 +92,7 @@ end
 ---@param dir Direction Direction to shift the game board in
 ---@param new_tile_cb ?function callback, when two tile merge and value of new tile is passed
 ---@return boolean success Performed some shift
-function GameBoard:shift(dir, new_tile_cb)
+function Game2048Board:shift(dir, new_tile_cb)
     local size = self._size
     -- This are variables that are used to navigate across game field depending on the chosen direction on movement
     local pos, tile_dist, group_dist
@@ -166,7 +166,7 @@ end
 ---Place a new tile in a random empty slot.
 ---@return integer|nil location Index of the placed tile, or nil if the board was already full.
 ---@return boolean board_full True when no free slots remain (either was already full, or the placed tile was the last).
-function GameBoard:placeNew()
+function Game2048Board:placeNew()
     local field = self.field
     if not field then
         return nil, true
@@ -206,7 +206,7 @@ end
 ---Returns true when at least two adjacent tiles can be merged.
 ---Only call this when the board is known to be full (placeNew returned true as its second value).
 ---@return boolean
-function GameBoard:canMerge()
+function Game2048Board:canMerge()
     local field = self.field
     if not field then
         return false
@@ -225,7 +225,7 @@ function GameBoard:canMerge()
     return false
 end
 
-function GameBoard:dump()
+function Game2048Board:dump()
     local size = self._size
     local text = ""
     for row = 1, size do
@@ -239,4 +239,4 @@ function GameBoard:dump()
     return text
 end
 
-return GameBoard
+return Game2048Board

@@ -35,10 +35,10 @@ local Input = Device.input
 local Screen = Device.screen
 
 local Game2048Widget = require("ui.widget.game2048widget")
-local ScoreBoardWidget = require("ui.widget.scoreboardwidget")
+local Game2048ScoreBoardWidget = require("ui.widget.game2048scoreboardwidget")
 local Game2048Config = require("modules.game2048config")
-local GameBoard = require("modules.gameboard")
-local History = require("modules.history")
+local Game2048Board = require("modules.game2048board")
+local Game2048History = require("modules.game2048history")
 
 
 ---Convert seconds into format hh:mm:ss
@@ -250,8 +250,8 @@ end
 
 
 ---@class Game2048State
----@field history History
----@field board GameBoard
+---@field history Game2048History
+---@field board Game2048Board
 ---@field info Game2048Info
 ---@field profile string
 local Game2048State = { }
@@ -268,8 +268,8 @@ function Game2048State:new(obj)
 end
 
 function Game2048State:_init()
-    self.board = GameBoard:new()
-    self.history = History:new()
+    self.board = Game2048Board:new()
+    self.history = Game2048History:new()
     self.info = Game2048Info:new()
     self.settings = Game2048Config.makeDefaultSettings()
     self.profile = self.settings.profile
@@ -460,27 +460,27 @@ function Game2048Screen:init()
     }
 
     self._info_board = {
-        score = ScoreBoardWidget:new{
+        score = Game2048ScoreBoardWidget:new{
             name = _("Score"),
             value = "",
             show_parent = self,
         },
-        best = ScoreBoardWidget:new{
+        best = Game2048ScoreBoardWidget:new{
             name = _("Best Score"),
             value = "",
             show_parent = self,
         },
-        moves = ScoreBoardWidget:new{
+        moves = Game2048ScoreBoardWidget:new{
             name = _("Move"),
             value = "",
             show_parent = self,
         },
-        retries = ScoreBoardWidget:new{
+        retries = Game2048ScoreBoardWidget:new{
             name = _("Retries"),
             value = "",
             show_parent = self,
         },
-        timer = ScoreBoardWidget:new{
+        timer = Game2048ScoreBoardWidget:new{
             name = _("Timer"),
             value = "",
             show_parent = self,

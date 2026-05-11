@@ -1,5 +1,5 @@
----@class History
-local History = {
+---@class Game2048History
+local Game2048History = {
     capacity = 10,
 
     _history = nil,
@@ -16,7 +16,7 @@ local function nextPosition(pos, capacity)
     return capacity ~= pos and pos + 1 or 1
 end
 
-function History:new(obj)
+function Game2048History:new(obj)
     obj = obj or {
         capacity = 10,
 
@@ -38,14 +38,14 @@ function History:new(obj)
     return obj
 end
 
-function History:clear()
+function Game2048History:clear()
     self._history = {}
     self._head = 1
     self._tail = 1
     self._position = prevPosition(self._head, self.capacity)
 end
 
-function History:push(item)
+function Game2048History:push(item)
     -- new position should discard any items that may be between current position and head, i.e. undo-ed items,
     -- therefore we are placing new history item after current position, not at head. 
     local new_position = nextPosition(self._position, self.capacity)
@@ -64,26 +64,26 @@ function History:push(item)
     self._position = new_position
 end
 
-function History:isEmpty()
+function Game2048History:isEmpty()
     return self._head == self._tail
 end
 
-function History:current()
+function Game2048History:current()
     if self:isEmpty() then
         return nil
     end
     return self._history[self._position]
 end
 
-function History:canUndo()
+function Game2048History:canUndo()
     return not self:isEmpty() and self._position ~= self._tail
 end
 
-function History:canRedo()
+function Game2048History:canRedo()
     return nextPosition(self._position, self.capacity) ~= self._head
 end
 
-function History:undo()
+function Game2048History:undo()
     if not self:canUndo() then
         return nil
     end
@@ -91,7 +91,7 @@ function History:undo()
     return self._history[self._position]
 end
 
-function History:redo()
+function Game2048History:redo()
     if not self:canRedo() then
         return nil
     end
@@ -99,7 +99,7 @@ function History:redo()
     return self._history[self._position]
 end
 
-function History:_free(from, to)
+function Game2048History:_free(from, to)
     local pos = from
     local history = self._history
     local capacity = self.capacity
@@ -110,7 +110,7 @@ function History:_free(from, to)
     end
 end
 
-function History:save()
+function Game2048History:save()
     local hist = {}
     local pos = 0
     local it = self._tail
@@ -128,7 +128,7 @@ function History:save()
     }
 end
 
-function History:read(dump)
+function Game2048History:read(dump)
     if not dump or not dump.history or not dump.position then
         return false
     end
@@ -147,4 +147,4 @@ function History:read(dump)
     return true
 end
 
-return History
+return Game2048History

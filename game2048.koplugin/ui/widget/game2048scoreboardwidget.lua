@@ -19,7 +19,7 @@ local _ = require("gettext")
 local Screen = Device.screen
 
 
-local ScoreBoardWidget = Widget:extend{
+local Game2048ScoreBoardWidget = Widget:extend{
     width = Screen:scaleBySize(130),
     face = Font:getFace("cfont", 20),
     show_parent = nil,
@@ -28,7 +28,7 @@ local ScoreBoardWidget = Widget:extend{
     value = "",
 }
 
-function ScoreBoardWidget:init()
+function Game2048ScoreBoardWidget:init()
     self.frame = FrameContainer:new{
         background = Blitbuffer.COLOR_WHITE,
         color = Blitbuffer.COLOR_BLACK,
@@ -67,7 +67,7 @@ function ScoreBoardWidget:init()
     self._value_label = value_label
 end
 
-function ScoreBoardWidget:paintTo(bb, x, y)
+function Game2048ScoreBoardWidget:paintTo(bb, x, y)
     if not self.dimen then
         local content_size = self[1]:getSize()
         self.dimen = Geom:new{
@@ -78,11 +78,11 @@ function ScoreBoardWidget:paintTo(bb, x, y)
     self[1]:paintTo(bb, x, y)
 end
 
-function ScoreBoardWidget:getSize()
+function Game2048ScoreBoardWidget:getSize()
     return self[1]:getSize()
 end
 
-function ScoreBoardWidget:setValue(text)
+function Game2048ScoreBoardWidget:setValue(text)
     self._value_label:setText(text)
     if self.dimen then
         -- Only redraw once the position is known
@@ -90,4 +90,4 @@ function ScoreBoardWidget:setValue(text)
     end
 end
 
-return ScoreBoardWidget
+return Game2048ScoreBoardWidget
