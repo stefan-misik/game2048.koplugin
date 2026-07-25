@@ -17,6 +17,7 @@ Game2048Settings.DEFAULTS = {
     size = 4,
     new_tile_delay = 0.1,
     theme = "default",
+    tile_value_style = "plain",
 }
 
 function Game2048Settings:new(obj)
@@ -112,6 +113,15 @@ function Game2048Config:init()
                     event = "DummyEvent",
                     args = { "default", "player2", "player3", "player4", "player5", "player6", },
                 },
+                {
+                    name = "tile_value_style",
+                    name_text = _("Tile Values"),
+                    toggle = { _("Number"), _("k suffix") },
+                    values = { "plain", "compact" },
+                    default_value = Game2048Settings.DEFAULTS.tile_value_style,
+                    event = "DummyEvent",
+                    args = { "plain", "compact" },
+                },
             },
         },
     }
@@ -197,10 +207,11 @@ function Game2048Config:onConfigChange(option_name, option_value)
         self.ui:handleEvent(Event:new("ThemeChange", option_value))
     elseif "profile" == option_name then
         self.ui:handleEvent(Event:new("ProfileChange", option_value))
+    elseif "tile_value_style" == option_name then
+        self.ui:handleEvent(Event:new("TileValueStyleChange", option_value))
     end
 
     return true
 end
 
 return Game2048Config
-

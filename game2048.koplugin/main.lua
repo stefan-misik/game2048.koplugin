@@ -599,11 +599,16 @@ function Game2048Screen:onProfileChange(profile_name)
     end
 end
 
+function Game2048Screen:onTileValueStyleChange(style)
+    self._game_widget:setTileValueStyle(style)
+end
+
 function Game2048Screen:applySettings()
     local settings = self.state.settings
     local game_widget = self._game_widget
     game_widget.new_tile_delay = settings.new_tile_delay
     game_widget:setPalette(loadGame2048WidgetThemePalette(settings.theme))
+    game_widget:setTileValueStyle(settings.tile_value_style)
 end
 
 function Game2048Screen:onClose()

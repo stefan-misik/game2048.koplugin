@@ -16,10 +16,12 @@ local ALLOWED_LENGTHS = {
 }
 
 local MAX_VALUE = 2 + 25
--- Calculate the strings to show in tiles
-local VALUE_STR = {}
-for n = 1,MAX_VALUE do
-    VALUE_STR[n] = tostring(math.pow(2, n))
+local function formatTileValue(value, style)
+    local tile_value = math.pow(2, value)
+    if style == "compact" and tile_value >= (8 * 1024) then
+        return string.format("%dk", tile_value / 1024)
+    end
+    return tostring(tile_value)
 end
 
 -- Configuration
@@ -55,6 +57,7 @@ local Game2048Widget = InputContainer:extend{
     palette = require("ui.theme.game2048widgettheme")[1].palette,
     -- Other settings
     new_tile_delay = 0.1,
+    tile_value_style = "plain",
 
     -- Notify about events
     move_handler = nil,
@@ -141,7 +144,7 @@ function Game2048Widget:paintTo(bb, x, y)
             -- No need to check the boundaries as we would not be here if #self.numbers ~= (size * size)
             local value = number_pos ~= self._hidden_tile_index and self.numbers[number_pos] or 0
             if value > 0 then
-                local value_str, prop = VALUE_STR[value] or TILE_FALLBACK_TEXT,
+                local value_str, prop = formatTileValue(value, self.tile_value_style) or TILE_FALLBACK_TEXT,
                     self._value_str_props[value] or self._value_str_props[MAX_VALUE + 1]  -- ... or fallback
                 local bg_color, fg_color = self:_getTileColors(value)
                 paintRoundedRect(bb, tile_x + INNER_TILE_MARGIN, tile_y + INNER_TILE_MARGIN,
@@ -182,14 +185,20 @@ function Game2048Widget:setPalette(palette)
     UIManager:setDirty(self.show_parent or self, "ui", self.dimen)
 end
 
+function Game2048Widget:setTileValueStyle(style)
+    self.tile_value_style = style == "compact" and "compact" or "plain"
+    self:_update(true)
+    UIManager:setDirty(self.show_parent or self, "ui", self.dimen)
+end
+
 function Game2048Widget:_uncoverHiddenTile()
     self._hidden_tile_index = 0
     UIManager:setDirty(self.show_parent or self, "ui", self.dimen)
 end
 
-function Game2048Widget:_update()
+function Game2048Widget:_update(force)
     local size = ALLOWED_LENGTHS[#self.numbers] or nil
-    if size == self._size then
+    if not force and size == self._size then
         return -- Size of the game board has not changed
     end
     self._size = size
@@ -206,7 +215,7 @@ function Game2048Widget:_update()
     local max_text_width = self._tile_side - (2 * (INNER_TILE_MARGIN + INNER_TILE_PADDING))
     local value_str_props = {}
     for n = 1, (MAX_VALUE + 1) do  -- One additional props for the fallback text
-        local value_str = VALUE_STR[n] or TILE_FALLBACK_TEXT
+        local value_str = formatTileValue(n, self.tile_value_style) or TILE_FALLBACK_TEXT
         local face = self.face
         local tsize
         while true do
