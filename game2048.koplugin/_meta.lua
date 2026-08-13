@@ -3,5 +3,5 @@ return {
     name = "game2048",
     fullname = _("2048"),
     description = _([[Game inspired by 2048]]),
-    version = "1.1.0",
+    version = "1.2.0",
 }
