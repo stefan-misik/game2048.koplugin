@@ -2,6 +2,7 @@ local ButtonDialog = require("ui/widget/buttondialog")
 local ConfigDialog = require("ui/widget/configdialog")
 local Event = require("ui/event")
 local InfoMessage = require("ui/widget/infomessage")  -- luacheck:ignore
+local InputDialog = require("ui/widget/inputdialog")
 local InputContainer = require("ui/widget/container/inputcontainer")
 local UIManager = require("ui/uimanager")
 local _ = require("gettext")
@@ -18,7 +19,27 @@ Game2048Settings.DEFAULTS = {
     new_tile_delay = 0.1,
     theme = "default",
     tile_value_style = "plain",
+    profile_names = { }
 }
+
+Game2048Settings.PROFILE_LABELS = {
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+}
+
+Game2048Settings.PROFILE_NAMES = {
+    "default",
+    "player2",
+    "player3",
+    "player4",
+    "player5",
+    "player6",
+}
+
 
 function Game2048Settings:new(obj)
     obj = obj or { };
@@ -59,6 +80,10 @@ function Game2048Settings:dump()
     return dump
 end
 
+function Game2048Settings:getProfileName(profile_id)
+    return self.profile_names[profile_id]
+end
+
 
 local Game2048Config = InputContainer:extend{
     new_settings_callback = nil,
@@ -67,6 +92,21 @@ local Game2048Config = InputContainer:extend{
 
 function Game2048Config.makeDefaultSettings()
     return Game2048Settings:new()
+end
+
+function Game2048Config:_profileNamePrompt()
+    return self.configurable:getProfileName(self.configurable.profile) or _("[Create Name]")
+end
+
+function Game2048Config:_updateProfileNamePrompt()
+    self.options[2].options[4].item_text = { self:_profileNamePrompt() }
+    if self.config_dialog then
+        local config_dialog = self.config_dialog
+        config_dialog:update()
+        UIManager:setDirty(config_dialog, function()
+            return "ui", config_dialog.dialog_frame.dimen
+        end)
+    end
 end
 
 function Game2048Config:init()
@@ -107,11 +147,17 @@ function Game2048Config:init()
                 {
                     name = "profile",
                     name_text = _("Profile"),
-                    toggle = { "1", "2", "3", "4", "5", "6", },
-                    values = { "default", "player2", "player3", "player4", "player5", "player6", },
+                    toggle = Game2048Settings.PROFILE_LABELS,
+                    values = Game2048Settings.PROFILE_NAMES,
                     default_value = Game2048Settings.DEFAULTS.profile,
                     event = "DummyEvent",
-                    args = { "default", "player2", "player3", "player4", "player5", "player6", },
+                    args = Game2048Settings.PROFILE_NAMES,
+                },
+                {  -- Update indexes in _updateProfileNamePrompt if this is moved
+                    name = "rename_profile",
+                    name_text = _("Rename"),
+                    item_text = { self:_profileNamePrompt() },
+                    event = "RenameProfile",
                 },
                 {
                     name = "tile_value_style",
@@ -158,6 +204,56 @@ function Game2048Config:onCloseCallback()
     if self.new_settings_callback then
         self.new_settings_callback()
     end
+end
+
+function Game2048Config:onRenameProfile()
+    local settings = self.configurable
+    local current_name = settings:getProfileName(settings.profile) or ""
+
+    self._rename_dialog = InputDialog:new{
+        title = _("Rename Profile"),
+        input = current_name,
+        input_hint = current_name,
+        buttons = {{
+            {
+                text = _("Cancel"),
+                id = "close",
+                callback = function()
+                    UIManager:close(self._rename_dialog)
+                    self._rename_dialog = nil
+                end,
+            },
+            {
+                text = _("Clear"),
+                callback = function()
+                    UIManager:close(self._rename_dialog)
+                    self._rename_dialog = nil
+
+                    settings.profile_names[settings.profile] = nil
+                    self:_updateProfileNamePrompt()
+                    -- TODO: notify
+                end,
+            },
+            {
+                text = _("Rename"),
+                is_enter_default = true,
+                callback = function()
+                    local new_name = self._rename_dialog:getInputText()
+                    UIManager:close(self._rename_dialog)
+                    self._rename_dialog = nil
+                    if new_name == "" then
+                        new_name = nil
+                    end
+                    settings.profile_names[settings.profile] = new_name
+                    self:_updateProfileNamePrompt()
+                    -- TODO: notify
+                end,
+            },
+        }},
+    }
+
+    UIManager:show(self._rename_dialog)
+    self._rename_dialog:onShowKeyboard()
 end
 
 function Game2048Config:onSelectTheme()
@@ -207,6 +303,7 @@ function Game2048Config:onConfigChange(option_name, option_value)
         self.ui:handleEvent(Event:new("ThemeChange", option_value))
     elseif "profile" == option_name then
         self.ui:handleEvent(Event:new("ProfileChange", option_value))
+        self:_updateProfileNamePrompt()
     elseif "tile_value_style" == option_name then
         self.ui:handleEvent(Event:new("TileValueStyleChange", option_value))
     end
