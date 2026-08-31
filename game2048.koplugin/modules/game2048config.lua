@@ -2,6 +2,7 @@ local ButtonDialog = require("ui/widget/buttondialog")
 local ConfigDialog = require("ui/widget/configdialog")
 local Event = require("ui/event")
 local InfoMessage = require("ui/widget/infomessage")  -- luacheck:ignore
+local InputDialog = require("ui/widget/inputdialog")
 local InputContainer = require("ui/widget/container/inputcontainer")
 local UIManager = require("ui/uimanager")
 local _ = require("gettext")
@@ -18,6 +19,16 @@ Game2048Settings.DEFAULTS = {
     new_tile_delay = 0.1,
     theme = "default",
     tile_value_style = "plain",
+    profile_names = {},
+}
+
+Game2048Settings.PROFILES = {
+    { id = "default",  fallback_name = "1" },
+    { id = "player2",  fallback_name = "2" },
+    { id = "player3",  fallback_name = "3" },
+    { id = "player4",  fallback_name = "4" },
+    { id = "player5",  fallback_name = "5" },
+    { id = "player6",  fallback_name = "6" },
 }
 
 function Game2048Settings:new(obj)
@@ -37,6 +48,8 @@ function Game2048Settings:reset()
     for name, value in pairs(Game2048Settings.DEFAULTS) do
         self[name] = value
     end
+    -- Ensure profile_names is a new table instance
+    self.profile_names = {}
 end
 
 function Game2048Settings:merge(obj)
@@ -46,7 +59,14 @@ function Game2048Settings:merge(obj)
     for name, _ in pairs(Game2048Settings.DEFAULTS) do
         local new_value = obj[name]
         if new_value ~= nil then
-            self[name] = new_value
+            if name == "profile_names" and type(new_value) == "table" then
+                -- Merge profile names into existing table
+                for k, v in pairs(new_value) do
+                    self.profile_names[k] = v
+                end
+            else
+                self[name] = new_value
+            end
         end
     end
 end
@@ -57,6 +77,32 @@ function Game2048Settings:dump()
         dump[name] = self[name]
     end
     return dump
+end
+
+--- Get the display name for a profile
+---@param profile_id string Internal profile identifier
+---@return string display_name
+function Game2048Settings:getProfileDisplayName(profile_id)
+    local custom = self.profile_names[profile_id]
+    if custom and custom ~= "" then
+        return custom
+    end
+    for _, p in ipairs(Game2048Settings.PROFILES) do
+        if p.id == profile_id then
+            return p.fallback_name
+        end
+    end
+    return profile_id
+end
+
+--- Get toggle labels for all profiles
+---@return table toggle_labels
+function Game2048Settings:getProfileToggleLabels()
+    local labels = {}
+    for _, p in ipairs(Game2048Settings.PROFILES) do
+        table.insert(labels, self:getProfileDisplayName(p.id))
+    end
+    return labels
 end
 
 
@@ -70,6 +116,11 @@ function Game2048Config.makeDefaultSettings()
 end
 
 function Game2048Config:init()
+    local profile_values = {}
+    for _, p in ipairs(Game2048Settings.PROFILES) do
+        table.insert(profile_values, p.id)
+    end
+
     self.options = {
         prefix = "game2048",
         {
@@ -107,11 +158,17 @@ function Game2048Config:init()
                 {
                     name = "profile",
                     name_text = _("Profile"),
-                    toggle = { "1", "2", "3", "4", "5", "6", },
-                    values = { "default", "player2", "player3", "player4", "player5", "player6", },
+                    toggle = self.configurable:getProfileToggleLabels(),
+                    values = profile_values,
                     default_value = Game2048Settings.DEFAULTS.profile,
                     event = "DummyEvent",
-                    args = { "default", "player2", "player3", "player4", "player5", "player6", },
+                    args = profile_values,
+                },
+                {
+                    name = "rename_profile",
+                    name_text = _("Rename Profile"),
+                    item_text = { _("Rename") .. "…" },
+                    event = "RenameProfile",
                 },
                 {
                     name = "tile_value_style",
@@ -157,6 +214,73 @@ function Game2048Config:onCloseCallback()
     self.config_dialog = nil
     if self.new_settings_callback then
         self.new_settings_callback()
+    end
+end
+
+function Game2048Config:onRenameProfile()
+    local settings = self.configurable
+    local current_profile = settings.profile
+    local current_name = settings:getProfileDisplayName(current_profile)
+
+    self._rename_dialog = InputDialog:new{
+        title = _("Rename Profile"),
+        input = current_name,
+        input_hint = current_name,
+        buttons = {{
+            {
+                text = _("Cancel"),
+                id = "close",
+                callback = function()
+                    UIManager:close(self._rename_dialog)
+                    self._rename_dialog = nil
+                end,
+            },
+            {
+                text = _("Clear"),
+                callback = function()
+                    settings.profile_names[current_profile] = nil
+                    UIManager:close(self._rename_dialog)
+                    self._rename_dialog = nil
+                    self:_refreshProfileToggleLabels()
+                end,
+            },
+            {
+                text = _("Rename"),
+                is_enter_default = true,
+                callback = function()
+                    local new_name = self._rename_dialog:getInputText()
+                    if new_name and new_name ~= "" then
+                        settings.profile_names[current_profile] = new_name
+                    else
+                        settings.profile_names[current_profile] = nil
+                    end
+                    UIManager:close(self._rename_dialog)
+                    self._rename_dialog = nil
+                    self:_refreshProfileToggleLabels()
+                end,
+            },
+        }},
+    }
+
+    UIManager:show(self._rename_dialog)
+    self._rename_dialog:onShowKeyboard()
+end
+
+function Game2048Config:_refreshProfileToggleLabels()
+    -- Update the toggle labels in the profile option
+    local settings_panel = self.options[2]
+    if settings_panel then
+        for _, opt in ipairs(settings_panel.options) do
+            if opt.name == "profile" then
+                opt.toggle = self.configurable:getProfileToggleLabels()
+                break
+            end
+        end
+    end
+    -- Re-init the config dialog to reflect changes
+    if self.config_dialog then
+        self.config_dialog:init()
+        UIManager:setDirty(self.config_dialog, "ui")
     end
 end
 
