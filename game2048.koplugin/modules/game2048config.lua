@@ -19,7 +19,6 @@ Game2048Settings.DEFAULTS = {
     new_tile_delay = 0.1,
     theme = "default",
     tile_value_style = "plain",
-    profile_names = {},
 }
 
 Game2048Settings.PROFILES = {
@@ -48,8 +47,6 @@ function Game2048Settings:reset()
     for name, value in pairs(Game2048Settings.DEFAULTS) do
         self[name] = value
     end
-    -- Ensure profile_names is a new table instance
-    self.profile_names = {}
 end
 
 function Game2048Settings:merge(obj)
@@ -59,14 +56,7 @@ function Game2048Settings:merge(obj)
     for name, _ in pairs(Game2048Settings.DEFAULTS) do
         local new_value = obj[name]
         if new_value ~= nil then
-            if name == "profile_names" and type(new_value) == "table" then
-                -- Merge profile names into existing table
-                for k, v in pairs(new_value) do
-                    self.profile_names[k] = v
-                end
-            else
-                self[name] = new_value
-            end
+            self[name] = new_value
         end
     end
 end
@@ -81,11 +71,14 @@ end
 
 --- Get the display name for a profile
 ---@param profile_id string Internal profile identifier
+---@param profile_names ?table Optional mapping of profile_id -> custom name
 ---@return string display_name
-function Game2048Settings:getProfileDisplayName(profile_id)
-    local custom = self.profile_names[profile_id]
-    if custom and custom ~= "" then
-        return custom
+function Game2048Settings.getProfileDisplayName(profile_id, profile_names)
+    if profile_names then
+        local custom = profile_names[profile_id]
+        if custom and custom ~= "" then
+            return custom
+        end
     end
     for _, p in ipairs(Game2048Settings.PROFILES) do
         if p.id == profile_id then
@@ -96,11 +89,12 @@ function Game2048Settings:getProfileDisplayName(profile_id)
 end
 
 --- Get toggle labels for all profiles
+---@param profile_names ?table Optional mapping of profile_id -> custom name
 ---@return table toggle_labels
-function Game2048Settings:getProfileToggleLabels()
+function Game2048Settings.getProfileToggleLabels(profile_names)
     local labels = {}
     for _, p in ipairs(Game2048Settings.PROFILES) do
-        table.insert(labels, self:getProfileDisplayName(p.id))
+        table.insert(labels, Game2048Settings.getProfileDisplayName(p.id, profile_names))
     end
     return labels
 end
@@ -108,6 +102,8 @@ end
 
 local Game2048Config = InputContainer:extend{
     new_settings_callback = nil,
+    rename_profile_callback = nil,
+    profile_names_provider = nil,
     last_panel_index = 1,
 }
 
@@ -115,11 +111,17 @@ function Game2048Config.makeDefaultSettings()
     return Game2048Settings:new()
 end
 
+Game2048Config.PROFILES = Game2048Settings.PROFILES
+Game2048Config.getProfileDisplayName = Game2048Settings.getProfileDisplayName
+Game2048Config.getProfileToggleLabels = Game2048Settings.getProfileToggleLabels
+
 function Game2048Config:init()
     local profile_values = {}
     for _, p in ipairs(Game2048Settings.PROFILES) do
         table.insert(profile_values, p.id)
     end
+
+    local profile_names = self.profile_names_provider and self.profile_names_provider() or nil
 
     self.options = {
         prefix = "game2048",
@@ -158,7 +160,7 @@ function Game2048Config:init()
                 {
                     name = "profile",
                     name_text = _("Profile"),
-                    toggle = self.configurable:getProfileToggleLabels(),
+                    toggle = Game2048Settings.getProfileToggleLabels(profile_names),
                     values = profile_values,
                     default_value = Game2048Settings.DEFAULTS.profile,
                     event = "DummyEvent",
@@ -220,7 +222,8 @@ end
 function Game2048Config:onRenameProfile()
     local settings = self.configurable
     local current_profile = settings.profile
-    local current_name = settings:getProfileDisplayName(current_profile)
+    local profile_names = self.profile_names_provider and self.profile_names_provider() or nil
+    local current_name = Game2048Settings.getProfileDisplayName(current_profile, profile_names)
 
     self._rename_dialog = InputDialog:new{
         title = _("Rename Profile"),
@@ -238,9 +241,11 @@ function Game2048Config:onRenameProfile()
             {
                 text = _("Clear"),
                 callback = function()
-                    settings.profile_names[current_profile] = nil
                     UIManager:close(self._rename_dialog)
                     self._rename_dialog = nil
+                    if self.rename_profile_callback then
+                        self.rename_profile_callback(current_profile, nil)
+                    end
                     self:_refreshProfileToggleLabels()
                 end,
             },
@@ -249,13 +254,14 @@ function Game2048Config:onRenameProfile()
                 is_enter_default = true,
                 callback = function()
                     local new_name = self._rename_dialog:getInputText()
-                    if new_name and new_name ~= "" then
-                        settings.profile_names[current_profile] = new_name
-                    else
-                        settings.profile_names[current_profile] = nil
+                    if new_name == "" then
+                        new_name = nil
                     end
                     UIManager:close(self._rename_dialog)
                     self._rename_dialog = nil
+                    if self.rename_profile_callback then
+                        self.rename_profile_callback(current_profile, new_name)
+                    end
                     self:_refreshProfileToggleLabels()
                 end,
             },
@@ -267,12 +273,13 @@ function Game2048Config:onRenameProfile()
 end
 
 function Game2048Config:_refreshProfileToggleLabels()
+    local profile_names = self.profile_names_provider and self.profile_names_provider() or nil
     -- Update the toggle labels in the profile option
     local settings_panel = self.options[2]
     if settings_panel then
         for _, opt in ipairs(settings_panel.options) do
             if opt.name == "profile" then
-                opt.toggle = self.configurable:getProfileToggleLabels()
+                opt.toggle = Game2048Settings.getProfileToggleLabels(profile_names)
                 break
             end
         end

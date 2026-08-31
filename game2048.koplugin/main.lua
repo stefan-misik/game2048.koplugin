@@ -97,6 +97,7 @@ function Game2048Storage:saveGameState(profile, state)
         history = state.history:save(),
         info = state.info:saveUntracked(),
         settings = {
+            name = state.profile_name,
         },
     }
     self._settings:saveSetting("state_"..profile, state_dump)
@@ -118,6 +119,7 @@ function Game2048Storage:readGameState(profile, state)
     local state_dump = self._settings:readSetting("state_"..profile)
     if state_dump then
         state.settings:merge(state_dump.settings)
+        state.profile_name = state_dump.settings and state_dump.settings.name or nil
         if state.history:read(state_dump.history) and state.info:readUntracked(state_dump.info) then
             return state:pullFromHistory()  -- Read data from history into game board and info (score board)
         end
@@ -139,6 +141,34 @@ function Game2048Storage:switchGameState(state)
         state:newGame()
     end
     return true
+end
+
+--- Read the display names of all profiles from storage
+---@return table profile_names Mapping of profile_id -> name (or nil)
+function Game2048Storage:readAllProfileNames()
+    local names = {}
+    for _, p in ipairs(Game2048Config.PROFILES) do
+        local state_dump = self._settings:readSetting("state_"..p.id)
+        if state_dump and state_dump.settings and state_dump.settings.name then
+            names[p.id] = state_dump.settings.name
+        end
+    end
+    return names
+end
+
+--- Set the display name for a profile in storage
+---@param profile_id string
+---@param name ?string New name, or nil to clear
+function Game2048Storage:setProfileName(profile_id, name)
+    local state_dump = self._settings:readSetting("state_"..profile_id)
+    if not state_dump then
+        state_dump = { settings = {} }
+    end
+    if not state_dump.settings then
+        state_dump.settings = {}
+    end
+    state_dump.settings.name = name
+    self._settings:saveSetting("state_"..profile_id, state_dump)
 end
 
 function Game2048Storage:flush()
@@ -254,6 +284,7 @@ end
 ---@field board GameBoard
 ---@field info Game2048Info
 ---@field profile string
+---@field profile_name ?string Custom display name for current profile
 local Game2048State = { }
 Game2048State.__index = Game2048State
 
@@ -273,6 +304,7 @@ function Game2048State:_init()
     self.info = Game2048Info:new()
     self.settings = Game2048Config.makeDefaultSettings()
     self.profile = self.settings.profile
+    self.profile_name = nil
 end
 
 function Game2048State:reset()
@@ -381,6 +413,8 @@ function Game2048Screen:init()
         ui = self,
         configurable = self.state.settings,
         new_settings_callback = function() self:onNewSettings() end,
+        rename_profile_callback = function(profile_id, new_name) self:onRenameProfile(profile_id, new_name) end,
+        profile_names_provider = function() return self.storage:readAllProfileNames() end,
     }
 
     self._title_bar = TitleBar:new{
@@ -597,6 +631,15 @@ function Game2048Screen:onProfileChange(profile_name)
         self:_updateInfo()
         UIManager:setDirty(self, "ui", self._buttons.dimen)
     end
+end
+
+function Game2048Screen:onRenameProfile(profile_id, new_name)
+    -- Update the current state's profile_name if renaming the active profile
+    if profile_id == self.state.profile then
+        self.state.profile_name = new_name
+    end
+    -- Save the name into the profile's state in storage
+    self.storage:setProfileName(profile_id, new_name)
 end
 
 function Game2048Screen:onTileValueStyleChange(style)
